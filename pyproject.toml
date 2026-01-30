@@ -1,0 +1,25 @@
+[project]
+name = "insider-scan"
+version = "0.1.0"
+description = "Local mini-app to scan insider transactions via OpenInsider + SecForm4 and validate SEC EDGAR links."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.2.0",
+  "requests>=2.32.0",
+  "beautifulsoup4>=4.12.0",
+  "lxml>=5.2.0",
+  "tenacity>=8.2.0",
+  "streamlit>=1.35.0",
+  "python-dateutil>=2.9.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
