@@ -3,69 +3,12 @@ sources:
   secform4: true
 
 tickers:
-  - ABEO
-  - AKBA
-  - ALT
-  - ALVO
-  - AMSC
-  - FOLD
-  - AVXL
-  - NNNN
-  - ACHR
-  - ARDX
-  - ARQQ
-  - ARTNA
-  - ATRA
-  - AUTL
-  - BBNX
-  - TECH
-  - BCRX
-  - BHVN
-  - CABA
-  - CRDF
-  - CRVO
-  - CBUS
-  - CLOV
-  - CDXS
-  - QBTS
-  - GERN
-  - GOSS
-  - HAFN
-  - HLN
-  - IBRX
-  - IONQ
-  - IOVA
-  - IRWD
-  - JANX
-  - KBR
-  - KEP
-  - KRRO
-  - LENZ
-  - MNKD
-  - NAMM
-  - NNE
-  - NUVB
-  - OPAD
-  - OPK
-  - OTLK
-  - QUBT
-  - RGNX
-  - RZLT
-  - RGTI
-  - SANA
-  - SSYS
-  - SRFM
-  - TSHA
-  - TEVA
-  - TNXP
-  - UEC
-  - RARE
-  - VTRS
-  - MREO
+  - AAPL
+  - TSLA
+  - PLTR
+  - MSFT
 
-# opcjonalnie (jeśli nie podasz, użyje defaultów z config.py/env)
 sec:
-  # Wymagane przez SEC
   user_agent: "InsiderScan/0.1 (contact: you@example.com)"
   throttle_s: 0.35
   timeout_s: 20

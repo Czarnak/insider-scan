@@ -24,7 +24,6 @@ def _latest_output_csv() -> str | None:
 
 def _load_df(path: str) -> pd.DataFrame:
     df = pd.read_csv(path)
-    # Normalize expected columns if missing
     for col in [
         "ticker", "company_name", "insider_name", "role_relation", "transaction_type",
         "trade_date", "filing_date", "shares", "price", "value_usd",
@@ -137,17 +136,8 @@ with colA:
 
     st.dataframe(f_sorted[show_cols], use_container_width=True, height=520)
 
-    # Optional: simple time series count
-    st.subheader("Transaction count over time")
-    ts = f_sorted.dropna(subset=["trade_date"]).groupby("trade_date").size().reset_index(name="count")
-    if len(ts) > 0:
-        st.line_chart(ts.set_index("trade_date")["count"])
-    else:
-        st.caption("No dated transactions to chart.")
-
 with colB:
     st.subheader("Details")
-    # Use event_id selection (robust across Streamlit versions)
     event_ids = f_sorted["event_id"].dropna().astype(str).unique().tolist()
     if not event_ids:
         st.info("No rows to select.")

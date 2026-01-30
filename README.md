@@ -1,46 +1,45 @@
-
 # Insider Scan  
 **Insider trading scanner (OpenInsider / SecForm4 / SEC EDGAR)**
 
-Narzędzie informacyjne (Python 3.11+) do wyszukiwania i agregacji transakcji insider tradingu dla listy spółek w zadanym okresie.  
-Dane są zbierane z agregatorów (**OpenInsider**, **SecForm4**) i **walidowane / uzupełniane linkami z SEC EDGAR**, który jest traktowany jako źródło referencyjne („source of truth”) dla filingów.
+An informational tool (Python 3.11+) for discovering and aggregating insider trading transactions for a list of companies over a specified time range.  
+Data is collected from aggregators (**OpenInsider**, **SecForm4**) and **validated / enriched with links from SEC EDGAR**, which is treated as the reference (“source of truth”) for filings.
 
-Projekt działa lokalnie, bez kluczy API, z zachowaniem limitów i zasad SEC.
-
----
-
-## ✨ Funkcjonalności
-
-- ✅ Wsparcie wielu źródeł:
-  - **SecForm4** (CIK-based, stabilne)
-  - **OpenInsider** (opcjonalne, best-effort)
-- ✅ Centralna konfiguracja w **`config.yaml`**
-- ✅ Możliwość **włączania/wyłączania źródeł**
-- ✅ Automatyczne mapowanie **ticker → CIK → Form 4 (SEC EDGAR)**
-- ✅ Deduplikacja transakcji (hash + fuzzy merge)
-- ✅ Ocena jakości dopasowania (`confidence: HIGH / MED / LOW`)
-- ✅ CLI + Dashboard **Streamlit**
-- ✅ Cache HTTP + throttling + retry
-- ✅ Brak zależności od płatnych API
+The project runs locally, requires no API keys, and respects SEC rate limits and access rules.
 
 ---
 
-## 📁 Struktura projektu
+## ✨ Features
+
+- ✅ Multiple data sources:
+  - **SecForm4** (CIK-based, stable)
+  - **OpenInsider** (optional, best-effort)
+- ✅ Centralized configuration via **`config.yaml`**
+- ✅ Ability to **enable/disable individual sources**
+- ✅ Automatic **ticker → CIK → Form 4 (SEC EDGAR)** mapping
+- ✅ Transaction deduplication (hash + fuzzy merge)
+- ✅ Match quality assessment (`confidence: HIGH / MED / LOW`)
+- ✅ CLI + **Streamlit** dashboard
+- ✅ HTTP cache + throttling + retries
+- ✅ No dependency on paid APIs
+
+---
+
+## 📁 Project Structure
 
 ```
 
 insider-scan/
-├─ config.yaml               # konfiguracja runu (tickery, źródła)
+├─ config.yaml               # run configuration (tickers, sources)
 ├─ pyproject.toml
 ├─ README.md
-├─ app.py                    # dashboard Streamlit
+├─ app.py                    # Streamlit dashboard
 └─ src/
 └─ insider_scan/
 ├─ **main**.py         # python -m insider_scan
 ├─ cli.py              # CLI pipeline
 ├─ config.py           # HTTP / UA / throttling
-├─ settings.py         # loader YAML
-├─ merge.py            # deduplikacja i scalanie
+├─ settings.py         # YAML loader
+├─ merge.py            # deduplication and merging
 ├─ models.py           # TransactionRecord
 └─ sources/
 ├─ openinsider.py
@@ -51,11 +50,11 @@ insider-scan/
 
 ---
 
-## ⚙️ Konfiguracja (`config.yaml`)
+## ⚙️ Configuration (`config.yaml`)
 
-Plik `config.yaml` w katalogu projektu steruje zachowaniem aplikacji.
+The `config.yaml` file in the project root controls the application behavior.
 
-### Przykład:
+### Example:
 
 ```yaml
 sources:
@@ -74,15 +73,15 @@ sec:
   timeout_s: 20
 ````
 
-### Znaczenie:
+### Meaning:
 
-* `sources.openinsider` – włącz/wyłącz OpenInsider
-* `sources.secform4` – włącz/wyłącz SecForm4
-* `tickers` – domyślna lista tickerów
-* `sec.*` – opcjonalne nadpisanie ustawień HTTP (zalecane)
+* `sources.openinsider` – enable/disable OpenInsider
+* `sources.secform4` – enable/disable SecForm4
+* `tickers` – default list of tickers
+* `sec.*` – optional overrides for HTTP settings (recommended)
 
-> ⚠️ **SEC wymaga identyfikowalnego User-Agent** (email).
-> Zalecane jest też ustawienie zmiennej środowiskowej:
+> ⚠️ **SEC requires an identifiable User-Agent** (with an email address).
+> It is also recommended to set the environment variable:
 >
 > ```bash
 > export SEC_USER_AGENT="Your Name your@email.com"
@@ -90,7 +89,7 @@ sec:
 
 ---
 
-## 🧪 Instalacja
+## 🧪 Installation
 
 ```bash
 python -m venv .venv
@@ -102,27 +101,27 @@ pip install -e .
 
 ---
 
-## ▶️ Uruchomienie CLI
+## ▶️ Running the CLI
 
-### Standardowo (tickery + źródła z `config.yaml`)
+### Default (tickers and sources from `config.yaml`)
 
 ```bash
 python -m insider_scan --start 2025-12-01
 ```
 
-### Nadpisanie tickerów z CLI
+### Override tickers from the CLI
 
 ```bash
 python -m insider_scan --start 2025-12-01 --tickers AAPL TSLA
 ```
 
-### Co robi CLI:
+### What the CLI does:
 
-* zbiera dane z włączonych źródeł,
-* uzupełnia linki do **SEC EDGAR**,
-* deduplikuje transakcje,
-* wypisuje `df.head(20)` + statystyki,
-* zapisuje CSV do:
+* collects data from enabled sources,
+* enriches records with **SEC EDGAR** links,
+* deduplicates transactions,
+* prints `df.head(20)` + basic statistics,
+* saves a CSV file to:
 
 ```
 outputs/insider_YYYYMMDD_HHMMSS.csv
@@ -130,34 +129,34 @@ outputs/insider_YYYYMMDD_HHMMSS.csv
 
 ---
 
-## 📊 Dashboard Streamlit
+## 📊 Streamlit Dashboard
 
 ```bash
 streamlit run app.py
 ```
 
-### Funkcje dashboardu:
+### Dashboard features:
 
-* filtry:
+* filters:
 
   * ticker
-  * rola insidera
-  * zakres dat
-  * minimalna wartość transakcji
-  * źródło danych
-* tabela wynikowa z sortowaniem
-* panel **Details**:
+  * insider role
+  * date range
+  * minimum transaction value
+  * data source
+* sortable results table
+* **Details** panel:
 
-  * link do SEC EDGAR
-  * link do źródła
-* wykres liczby transakcji w czasie
-* eksport CSV
+  * SEC EDGAR link
+  * source link
+* transaction count over time chart
+* CSV export
 
-Dashboard:
+The dashboard:
 
-* używa ostatniego pliku CSV z `outputs/`,
-* domyślne tickery i źródła pobiera z `config.yaml`,
-* pozwala przełączać źródła checkboxami.
+* loads the most recent CSV from `outputs/`,
+* uses default tickers and source toggles from `config.yaml`,
+* allows switching sources via checkboxes.
 
 ---
 
@@ -165,83 +164,83 @@ Dashboard:
 
 * **HIGH**
 
-  * bezpośredni link do konkretnego filing Form 4 w SEC
-  * zgodność tickera + daty
+  * direct link to a specific Form 4 filing in SEC EDGAR
+  * ticker and date alignment
 * **MED**
 
-  * dopasowanie po dacie w submissions CIK
+  * matched by date within the company CIK submissions
 * **LOW**
 
-  * brak jednoznacznego filing linku (np. tylko agregator)
+  * no unambiguous filing link (aggregator-only data)
 
 ---
 
-## 🧠 Deduplikacja
+## 🧠 Deduplication
 
-Jedna transakcja = jeden rekord.
+One transaction = one record.
 
 * `event_id = sha1(ticker | insider | trade_date | shares | price | type | source)`
-* fuzzy merge:
+* fuzzy merge on:
 
   * `ticker`
   * `insider`
-  * `trade_date ± 1 dzień`
-  * `shares (zaokrąglone)`
-* preferencja:
+  * `trade_date ± 1 day`
+  * `shares (rounded)`
+* preference order:
 
-  1. rekord z linkiem SEC
-  2. wyższy `confidence`
+  1. record with SEC link
+  2. higher `confidence`
 
 ---
 
-## 🛡️ Stabilność i compliance
+## 🛡️ Stability and Compliance
 
-* OpenInsider traktowany jako **best-effort**
+* OpenInsider is treated as **best-effort**
 
-  * możliwe blokady (`WinError 10061`, 403, 429)
-  * pipeline **działa dalej** bez niego
+  * connection refusals, 403, or 429 responses are possible
+  * the pipeline **continues without it**
 * SecForm4:
 
-  * używa **CIK**, nie tickerów
-  * parsowanie przez `pandas.read_html`
+  * uses **CIK-based URLs**, not tickers
+  * table parsing via `pandas.read_html`
 * SEC EDGAR:
 
   * throttling
-  * cache
-  * zgodny User-Agent
+  * caching
+  * compliant User-Agent usage
 
 ---
 
-## ⚠️ Ograniczenia
+## ⚠️ Limitations
 
-* Narzędzie **nie jest poradą inwestycyjną**
-* Agregatory mogą mieć błędy lub opóźnienia
-* SEC może tymczasowo ograniczyć dostęp przy zbyt agresywnym ruchu
-* Struktura HTML źródeł może się zmienić (parsery defensywne)
-
----
-
-## 🔧 Rozszerzanie projektu
-
-Aby dodać nowe źródło:
-
-1. Dodaj plik w `sources/`
-2. Zwracaj `list[TransactionRecord]`
-3. Podłącz w `cli.py`
-4. Merge i dashboard zadziałają automatycznie
+* This tool **is not investment advice**
+* Aggregators may contain errors or delays
+* SEC may temporarily restrict access under heavy load
+* Source HTML structures may change over time (parsers are defensive)
+* Not all transaction types present themselves properly
 
 ---
 
-## ✅ Status projektu
+## 🔧 Extending the Project
 
-* Core pipeline: **stabilny**
-* SecForm4 + SEC EDGAR: **produkcyjnie używalne**
-* OpenInsider: **opcjonalny / niestabilny**
-* Konfiguracja YAML: **pełna kontrola runu**
+To add a new source:
+
+1. Add a new file under `sources/`
+2. Return `list[TransactionRecord]`
+3. Wire it into `cli.py`
+4. Merging and the dashboard will work automatically
 
 ---
 
-**Autor:** LCZ
-**Cel:** monitoring i analiza aktywności insiderów (research / due diligence)
+## ✅ Project Status
+
+* Core pipeline: **stable**
+* SecForm4 + SEC EDGAR: **production-ready**
+* OpenInsider: **optional / unstable**
+
+---
+
+**Author:** LCZ
+**Purpose:** monitoring and analysis of insider activity (research / due diligence)
 
 ---
