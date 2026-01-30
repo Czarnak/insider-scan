@@ -4,6 +4,8 @@ import hashlib
 import time
 from datetime import date
 from typing import Any
+from io import StringIO
+
 
 import pandas as pd
 import requests
@@ -159,7 +161,7 @@ def fetch_secform4(ticker: str, start_date: str) -> list[TransactionRecord]:
     html = _get_html(url)
 
     # read_html returns list of DataFrames for all tables found
-    tables = pd.read_html(html, flavor="lxml")
+    tables = pd.read_html(StringIO(html), flavor="lxml")
     if not tables:
         return []
 

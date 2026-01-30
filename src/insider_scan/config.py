@@ -36,3 +36,14 @@ OPENINSIDER_BASE = "https://openinsider.com"
 SECFORM4_BASE = "https://secform4.com"
 SEC_DATA_BASE = "https://data.sec.gov"
 SEC_WWW_BASE = "https://www.sec.gov"
+
+
+def apply_sec_overrides(user_agent: str | None = None, throttle_s: float | None = None, timeout_s: float | None = None) -> None:
+    """
+    Best-effort override runtime HTTP settings from config.yaml.
+    """
+    global HTTP
+    ua = user_agent if user_agent else HTTP.user_agent
+    thr = throttle_s if throttle_s is not None else HTTP.throttle_s
+    to = timeout_s if timeout_s is not None else HTTP.timeout_s
+    HTTP = HttpConfig(timeout_s=to, throttle_s=thr, max_retries=HTTP.max_retries, user_agent=ua)

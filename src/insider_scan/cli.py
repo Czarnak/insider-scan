@@ -18,6 +18,9 @@ from insider_scan.sources.sec_edgar import (
     find_form4_filing_near,
     build_filing_index_url,
 )
+from insider_scan.settings import load_config
+from insider_scan.config import apply_sec_overrides
+
 
 # ---------- logging ----------
 def setup_logger() -> logging.Logger:
@@ -98,7 +101,9 @@ def enrich_sec_links(records: list[TransactionRecord], logger: logging.Logger) -
 
 
 # ---------- pipeline ----------
-def run_pipeline(tickers: list[str], start_date: str, end_date: str | None = None) -> pd.DataFrame:
+def run_pipeline(tickers: list[str], start_date: str, end_date: str | None = None,
+                 enable_openinsider: bool = True, enable_secform4: bool = True) -> pd.DataFrame:
+
     logger = setup_logger()
     logger.info("Starting insider scan")
     logger.info(f"Tickers: {tickers}")
@@ -116,24 +121,34 @@ def run_pipeline(tickers: list[str], start_date: str, end_date: str | None = Non
         logger.info(f"--- {t} ---")
 
         # OpenInsider
-        try:
-            oi = fetch_openinsider(t, start_date=start_date)
-            logger.info(f"OpenInsider: {len(oi)} rows")
-            per_ticker.extend(oi)
-        except Exception as e:
-            logger.warning(f"OpenInsider failed for {t}: {e}")
+        if enable_openinsider:
+            try:
+                oi = fetch_openinsider(t, start_date=start_date)
+                logger.info(f"OpenInsider: {len(oi)} rows")
+                per_ticker.extend(oi)
+            except Exception as e:
+                msg = str(e)
+                if "WinError 10061" in msg or "actively refused" in msg:
+                    logger.warning(f"OpenInsider unavailable for {t} (connection refused). Skipping.")
+                else:
+                    logger.warning(f"OpenInsider failed for {t}: {e}")
+        else:
+            logger.info("OpenInsider: disabled by config")
 
         # SecForm4
-        try:
-            sf4 = fetch_secform4(t, start_date=start_date)
-            logger.info(f"SecForm4: {len(sf4)} rows")
-            per_ticker.extend(sf4)
-        except Exception as e:
-            logger.warning(f"SecForm4 failed for {t}: {e}")
+        if enable_secform4:
+            try:
+                sf4 = fetch_secform4(t, start_date=start_date)
+                logger.info(f"SecForm4: {len(sf4)} rows")
+                per_ticker.extend(sf4)
+            except Exception as e:
+                logger.warning(f"SecForm4 failed for {t}: {e}")
 
-        if not per_ticker:
-            tickers_no_data.append(t)
-            continue
+            if not per_ticker:
+                tickers_no_data.append(t)
+                continue
+        else:
+            logger.info("OpenInsider: disabled by config")
 
         # SEC enrichment
         try:
@@ -190,16 +205,46 @@ def run_pipeline(tickers: list[str], start_date: str, end_date: str | None = Non
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="insider_scan", description="Scan insider transactions via OpenInsider + SecForm4 and enrich SEC links.")
-    p.add_argument("--tickers", nargs="+", required=True, help="List of tickers, e.g. --tickers AAPL TSLA PLTR")
+    p = argparse.ArgumentParser(
+        prog="insider_scan",
+        description="Scan insider transactions via OpenInsider + SecForm4 and enrich SEC links.",
+    )
+    p.add_argument("--config", default="config.yaml", help="Path to YAML config (default: config.yaml)")
+    p.add_argument("--tickers", nargs="*", help="Optional list of tickers; if omitted uses config.yaml tickers")
     p.add_argument("--start", required=True, dest="start_date", help="Start date YYYY-MM-DD")
     return p
+
 
 
 def main() -> int:
     parser = build_arg_parser()
     args = parser.parse_args()
 
-    tickers = [t.upper().strip() for t in args.tickers if t.strip()]
-    _ = run_pipeline(tickers=tickers, start_date=args.start_date, end_date=None)
+    cfg = load_config(args.config)
+
+    # Apply SEC overrides (optional)
+    apply_sec_overrides(
+        user_agent=cfg.sec.user_agent,
+        throttle_s=cfg.sec.throttle_s,
+        timeout_s=cfg.sec.timeout_s,
+    )
+
+    # tickers: CLI overrides YAML if provided
+    if args.tickers and len(args.tickers) > 0:
+        tickers = [t.upper().strip() for t in args.tickers if t.strip()]
+    else:
+        tickers = cfg.tickers
+
+    if not tickers:
+        print("ERROR: No tickers provided (CLI or config.yaml).")
+        return 2
+
+    _ = run_pipeline(
+        tickers=tickers,
+        start_date=args.start_date,
+        end_date=None,
+        enable_openinsider=cfg.sources.openinsider,
+        enable_secform4=cfg.sources.secform4,
+    )
     return 0
+

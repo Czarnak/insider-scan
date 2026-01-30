@@ -1,6 +1,3 @@
-
-
-
 ### `app.py` (Streamlit)
 
 from __future__ import annotations
@@ -15,6 +12,8 @@ import streamlit as st
 
 from insider_scan.cli import run_pipeline
 from insider_scan.config import OUTPUT_DIR
+from insider_scan.settings import load_config
+
 
 
 def _latest_output_csv() -> str | None:
@@ -48,7 +47,13 @@ st.title("Insider Scan — OpenInsider + SecForm4 + SEC EDGAR")
 with st.sidebar:
     st.header("Run / Load")
     default_start = date.today().replace(day=1)
-    tickers_str = st.text_input("Tickers (space-separated)", value="AAPL TSLA PLTR")
+    cfg = load_config("config.yaml")
+    default_tickers = " ".join(cfg.tickers) if cfg.tickers else "AAPL TSLA PLTR"
+
+    tickers_str = st.text_input("Tickers (space-separated)", value=default_tickers)
+
+    enable_openinsider = st.checkbox("Enable OpenInsider", value=cfg.sources.openinsider)
+    enable_secform4 = st.checkbox("Enable SecForm4", value=cfg.sources.secform4)
     start_date = st.date_input("Start date", value=default_start)
     run_btn = st.button("Run scan now")
 
@@ -56,7 +61,14 @@ with st.sidebar:
 
 if run_btn:
     tickers = [t.strip().upper() for t in tickers_str.split() if t.strip()]
-    df = run_pipeline(tickers=tickers, start_date=str(start_date), end_date=None)
+    df = run_pipeline(
+        tickers=tickers,
+        start_date=str(start_date),
+        end_date=None,
+        enable_openinsider=enable_openinsider,
+        enable_secform4=enable_secform4,
+    )
+
     st.success(f"Scan finished: {len(df)} rows")
     latest = _latest_output_csv()
     if latest:
