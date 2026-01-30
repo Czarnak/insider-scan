@@ -241,7 +241,7 @@ Aby dodać nowe źródło:
 
 ---
 
-**Autor:** Lukas C
+**Autor:** LCZ
 **Cel:** monitoring i analiza aktywności insiderów (research / due diligence)
 
 ---
