@@ -1,4 +1,10 @@
-/outputs/
-/cache/
-/logs/
-/src/insider_scan.egg-info/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+cache/
+outputs/
+*.egg
+.venv/

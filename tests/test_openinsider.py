@@ -1,0 +1,87 @@
+"""Tests for openinsider.com scraper (mocked HTTP)."""
+
+from __future__ import annotations
+
+import responses
+
+from insider_scanner.core.openinsider import parse_openinsider_html, scrape_ticker, scrape_latest
+from tests.fixtures import OPENINSIDER_HTML
+
+
+class TestParseOpeninsider:
+    def test_parse_trades(self):
+        trades = parse_openinsider_html(OPENINSIDER_HTML)
+        assert len(trades) == 3
+
+    def test_source_set(self):
+        trades = parse_openinsider_html(OPENINSIDER_HTML)
+        assert all(t.source == "openinsider" for t in trades)
+
+    def test_tickers_extracted(self):
+        trades = parse_openinsider_html(OPENINSIDER_HTML)
+        tickers = {t.ticker for t in trades}
+        assert "AAPL" in tickers
+        assert "MSFT" in tickers
+        assert "TSLA" in tickers
+
+    def test_company_names(self):
+        trades = parse_openinsider_html(OPENINSIDER_HTML)
+        companies = {t.company for t in trades}
+        assert "Apple Inc" in companies
+        assert "Microsoft Corp" in companies
+
+    def test_trade_values(self):
+        trades = parse_openinsider_html(OPENINSIDER_HTML)
+        msft = [t for t in trades if t.ticker == "MSFT"]
+        assert len(msft) == 1
+        assert msft[0].value == 84_000_000
+        assert msft[0].shares == 200_000
+
+    def test_trade_type_classification(self):
+        trades = parse_openinsider_html(OPENINSIDER_HTML)
+        tsla = [t for t in trades if t.ticker == "TSLA"][0]
+        assert tsla.trade_type == "Buy"
+
+    def test_ticker_override(self):
+        trades = parse_openinsider_html(OPENINSIDER_HTML, ticker="AAPL")
+        # When ticker column is present in HTML, it should use that
+        tickers = {t.ticker for t in trades}
+        assert len(tickers) >= 1
+
+    def test_empty_html(self):
+        trades = parse_openinsider_html("<html><body></body></html>")
+        assert trades == []
+
+
+class TestScrapeOpeninsider:
+    @responses.activate
+    def test_scrape_ticker_mocked(self):
+        responses.add(
+            responses.GET,
+            "http://openinsider.com/screener",
+            body=OPENINSIDER_HTML,
+            status=200,
+        )
+        trades = scrape_ticker("AAPL", use_cache=False)
+        assert len(trades) >= 1
+
+    @responses.activate
+    def test_scrape_latest_mocked(self):
+        responses.add(
+            responses.GET,
+            "http://openinsider.com/screener",
+            body=OPENINSIDER_HTML,
+            status=200,
+        )
+        trades = scrape_latest(count=50, use_cache=False)
+        assert len(trades) >= 1
+
+    @responses.activate
+    def test_scrape_error(self):
+        responses.add(
+            responses.GET,
+            "http://openinsider.com/screener",
+            status=500,
+        )
+        trades = scrape_ticker("AAPL", use_cache=False)
+        assert trades == []

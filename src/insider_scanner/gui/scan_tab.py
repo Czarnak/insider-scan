@@ -1,0 +1,359 @@
+"""Scan tab: ticker search, source selection, filters, results table, EDGAR links."""
+
+from __future__ import annotations
+
+import webbrowser
+
+import pandas as pd
+from PySide6.QtCore import Qt, QThreadPool, Slot
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QSpinBox,
+    QSplitter,
+    QTableView,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
+from insider_scanner.gui.widgets import SortableTableModel
+from insider_scanner.utils.threading import Worker
+
+
+class ScanTab(QWidget):
+    """Full scan workflow: enter ticker → select sources → scan → view → EDGAR."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._trades: list = []
+        self._build_ui()
+
+    def _build_ui(self):
+        root = QVBoxLayout(self)
+
+        # --- Search controls ---
+        search_grp = QGroupBox("Search")
+        search_l = QHBoxLayout(search_grp)
+
+        search_l.addWidget(QLabel("Ticker:"))
+        self.ticker_edit = QLineEdit()
+        self.ticker_edit.setPlaceholderText("AAPL")
+        self.ticker_edit.setMaximumWidth(120)
+        self.ticker_edit.returnPressed.connect(self._run_scan)
+        search_l.addWidget(self.ticker_edit)
+
+        self.btn_scan = QPushButton("Scan Ticker")
+        self.btn_scan.clicked.connect(self._run_scan)
+        search_l.addWidget(self.btn_scan)
+
+        self.btn_latest = QPushButton("Latest Trades (all)")
+        self.btn_latest.clicked.connect(self._run_latest)
+        search_l.addWidget(self.btn_latest)
+
+        search_l.addStretch()
+        root.addWidget(search_grp)
+
+        # --- Source + filter controls ---
+        filter_row = QHBoxLayout()
+
+        # Sources
+        src_grp = QGroupBox("Sources")
+        src_l = QHBoxLayout(src_grp)
+        self.chk_secform4 = QCheckBox("secform4.com")
+        self.chk_secform4.setChecked(True)
+        self.chk_openinsider = QCheckBox("openinsider.com")
+        self.chk_openinsider.setChecked(True)
+        src_l.addWidget(self.chk_secform4)
+        src_l.addWidget(self.chk_openinsider)
+        filter_row.addWidget(src_grp)
+
+        # Filters
+        filt_grp = QGroupBox("Filters")
+        filt_l = QHBoxLayout(filt_grp)
+
+        filt_l.addWidget(QLabel("Type:"))
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(["All", "Buy", "Sell", "Exercise", "Other"])
+        filt_l.addWidget(self.type_combo)
+
+        filt_l.addWidget(QLabel("Min value ($):"))
+        self.min_value_spin = QDoubleSpinBox()
+        self.min_value_spin.setRange(0, 1_000_000_000)
+        self.min_value_spin.setDecimals(0)
+        self.min_value_spin.setSingleStep(10_000)
+        self.min_value_spin.setValue(0)
+        filt_l.addWidget(self.min_value_spin)
+
+        self.chk_congress = QCheckBox("Congress only")
+        filt_l.addWidget(self.chk_congress)
+
+        self.btn_filter = QPushButton("Apply Filters")
+        self.btn_filter.clicked.connect(self._apply_filters)
+        filt_l.addWidget(self.btn_filter)
+
+        filter_row.addWidget(filt_grp)
+        root.addLayout(filter_row)
+
+        # Progress
+        self.progress = QProgressBar()
+        self.progress.setVisible(False)
+        self.progress.setTextVisible(True)
+        root.addWidget(self.progress)
+
+        # --- Results ---
+        splitter = QSplitter(Qt.Orientation.Vertical)
+
+        # Table
+        table_widget = QWidget()
+        table_l = QVBoxLayout(table_widget)
+        table_l.setContentsMargins(0, 0, 0, 0)
+
+        self.status_label = QLabel("No scan results yet")
+        table_l.addWidget(self.status_label)
+
+        self.trades_model = SortableTableModel()
+        self.trades_table = QTableView()
+        self.trades_table.setModel(self.trades_model)
+        self.trades_table.setSortingEnabled(True)
+        self.trades_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.trades_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.trades_table.doubleClicked.connect(self._on_row_double_click)
+        table_l.addWidget(self.trades_table)
+
+        splitter.addWidget(table_widget)
+
+        # Bottom: action buttons + detail
+        bottom = QWidget()
+        bottom_l = QHBoxLayout(bottom)
+
+        self.btn_edgar = QPushButton("Open EDGAR Filing")
+        self.btn_edgar.clicked.connect(self._open_edgar)
+        self.btn_edgar.setEnabled(False)
+        bottom_l.addWidget(self.btn_edgar)
+
+        self.btn_save = QPushButton("Save Results")
+        self.btn_save.clicked.connect(self._save_results)
+        self.btn_save.setEnabled(False)
+        bottom_l.addWidget(self.btn_save)
+
+        self.btn_resolve_cik = QPushButton("Resolve CIK")
+        self.btn_resolve_cik.clicked.connect(self._resolve_cik)
+        bottom_l.addWidget(self.btn_resolve_cik)
+
+        bottom_l.addStretch()
+
+        self.detail_label = QLabel("")
+        self.detail_label.setWordWrap(True)
+        bottom_l.addWidget(self.detail_label, stretch=1)
+
+        splitter.addWidget(bottom)
+        splitter.setStretchFactor(0, 5)
+        splitter.setStretchFactor(1, 1)
+
+        root.addWidget(splitter, stretch=1)
+
+    # ------------------------------------------------------------------
+    # Scan
+    # ------------------------------------------------------------------
+
+    def _run_scan(self):
+        ticker = self.ticker_edit.text().strip().upper()
+        if not ticker:
+            QMessageBox.warning(self, "Input", "Enter a ticker symbol.")
+            return
+
+        self.btn_scan.setEnabled(False)
+        self.btn_latest.setEnabled(False)
+        self.progress.setVisible(True)
+        self.progress.setRange(0, 0)
+        self.progress.setFormat(f"Scanning {ticker}...")
+
+        use_sf4 = self.chk_secform4.isChecked()
+        use_oi = self.chk_openinsider.isChecked()
+
+        def work():
+            from insider_scanner.core.secform4 import scrape_ticker as sf4
+            from insider_scanner.core.openinsider import scrape_ticker as oi
+            from insider_scanner.core.merger import merge_trades
+            from insider_scanner.core.senate import flag_congress_trades
+
+            lists = []
+            if use_sf4:
+                lists.append(sf4(ticker))
+            if use_oi:
+                lists.append(oi(ticker))
+
+            merged = merge_trades(*lists)
+            flag_congress_trades(merged)
+            return merged
+
+        worker = Worker(work)
+        worker.signals.result.connect(self._on_scan_done)
+        worker.signals.error.connect(self._on_scan_error)
+        QThreadPool.globalInstance().start(worker)
+
+    def _run_latest(self):
+        self.btn_scan.setEnabled(False)
+        self.btn_latest.setEnabled(False)
+        self.progress.setVisible(True)
+        self.progress.setRange(0, 0)
+        self.progress.setFormat("Fetching latest trades...")
+
+        def work():
+            from insider_scanner.core.openinsider import scrape_latest
+            from insider_scanner.core.senate import flag_congress_trades
+
+            trades = scrape_latest(count=100)
+            flag_congress_trades(trades)
+            return trades
+
+        worker = Worker(work)
+        worker.signals.result.connect(self._on_scan_done)
+        worker.signals.error.connect(self._on_scan_error)
+        QThreadPool.globalInstance().start(worker)
+
+    @Slot(object)
+    def _on_scan_done(self, trades):
+        self._trades = trades
+        self.progress.setVisible(False)
+        self.btn_scan.setEnabled(True)
+        self.btn_latest.setEnabled(True)
+        self.btn_save.setEnabled(True)
+        self._display_trades(trades)
+
+    @Slot(tuple)
+    def _on_scan_error(self, error_info):
+        self.progress.setVisible(False)
+        self.btn_scan.setEnabled(True)
+        self.btn_latest.setEnabled(True)
+        exc_type, exc_value, _ = error_info
+        QMessageBox.critical(self, "Scan Error", f"{exc_type.__name__}: {exc_value}")
+
+    # ------------------------------------------------------------------
+    # Display + filter
+    # ------------------------------------------------------------------
+
+    def _display_trades(self, trades):
+        from insider_scanner.core.merger import trades_to_dataframe
+
+        df = trades_to_dataframe(trades)
+        if df.empty:
+            self.status_label.setText("No trades found.")
+            self.trades_model.set_dataframe(pd.DataFrame())
+            return
+
+        # Select display columns
+        display_cols = [
+            c for c in [
+                "trade_date", "ticker", "insider_name", "insider_title",
+                "trade_type", "shares", "price", "value",
+                "is_congress", "source", "edgar_url",
+            ]
+            if c in df.columns
+        ]
+        self.trades_model.set_dataframe(df[display_cols])
+        congress_count = sum(1 for t in trades if t.is_congress)
+        self.status_label.setText(
+            f"{len(trades)} trades found  |  {congress_count} congress-flagged"
+        )
+
+    def _apply_filters(self):
+        if not self._trades:
+            return
+
+        from insider_scanner.core.merger import filter_trades
+
+        trade_type = self.type_combo.currentText()
+        if trade_type == "All":
+            trade_type = None
+
+        min_val = self.min_value_spin.value()
+        if min_val == 0:
+            min_val = None
+
+        filtered = filter_trades(
+            self._trades,
+            trade_type=trade_type,
+            min_value=min_val,
+            congress_only=self.chk_congress.isChecked(),
+        )
+        self._display_trades(filtered)
+
+    # ------------------------------------------------------------------
+    # EDGAR + details
+    # ------------------------------------------------------------------
+
+    def _on_row_double_click(self, index):
+        row = index.row()
+        source_index = self.trades_model.mapToSource(index)
+        df = self.trades_model.dataframe
+        if row < len(self._trades):
+            trade = self._trades[source_index.row()]
+            detail = (
+                f"Name: {trade.insider_name}  |  Title: {trade.insider_title}\n"
+                f"Type: {trade.trade_type}  |  Shares: {trade.shares:,.0f}  |  "
+                f"Price: ${trade.price:,.2f}  |  Value: ${trade.value:,.0f}\n"
+                f"Source: {trade.source}"
+            )
+            if trade.is_congress:
+                detail += f"  |  Congress: {trade.congress_member}"
+            self.detail_label.setText(detail)
+            self.btn_edgar.setEnabled(True)
+
+    def _open_edgar(self):
+        # Get selected row
+        indexes = self.trades_table.selectionModel().selectedRows()
+        if not indexes:
+            return
+
+        source_index = self.trades_model.mapToSource(indexes[0])
+        row = source_index.row()
+        if row < len(self._trades):
+            trade = self._trades[row]
+            if trade.edgar_url:
+                webbrowser.open(trade.edgar_url)
+            else:
+                from insider_scanner.core.edgar import build_edgar_url_for_trade
+                url = build_edgar_url_for_trade(trade)
+                webbrowser.open(url)
+
+    def _resolve_cik(self):
+        ticker = self.ticker_edit.text().strip().upper()
+        if not ticker:
+            return
+
+        from insider_scanner.core.edgar import resolve_cik, get_filing_url
+
+        cik = resolve_cik(ticker)
+        if cik:
+            url = get_filing_url(cik)
+            self.detail_label.setText(f"{ticker} → CIK {cik}\nFilings: {url}")
+            webbrowser.open(url)
+        else:
+            self.detail_label.setText(f"Could not resolve CIK for {ticker}")
+
+    # ------------------------------------------------------------------
+    # Save
+    # ------------------------------------------------------------------
+
+    def _save_results(self):
+        if not self._trades:
+            return
+
+        from insider_scanner.core.merger import save_scan_results
+
+        ticker = self.ticker_edit.text().strip().upper() or "latest"
+        out = save_scan_results(self._trades, label=f"{ticker}_scan")
+        QMessageBox.information(self, "Saved", f"Results saved to:\n{out}")

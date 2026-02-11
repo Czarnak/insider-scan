@@ -1,0 +1,10 @@
+[
+  {"name": "Pelosi Nancy", "state": "CA", "chamber": "House", "party": "D"},
+  {"name": "Tuberville Tommy", "state": "AL", "chamber": "Senate", "party": "R"},
+  {"name": "Crenshaw Dan", "state": "TX", "chamber": "House", "party": "R"},
+  {"name": "Ossoff Jon", "state": "GA", "chamber": "Senate", "party": "D"},
+  {"name": "Sullivan Dan", "state": "AK", "chamber": "Senate", "party": "R"},
+  {"name": "Hagerty Bill", "state": "TN", "chamber": "Senate", "party": "R"},
+  {"name": "Manchin Joe", "state": "WV", "chamber": "Senate", "party": "D"},
+  {"name": "Lummis Cynthia", "state": "WY", "chamber": "Senate", "party": "R"}
+]

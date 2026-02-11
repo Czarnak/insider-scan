@@ -1,246 +1,164 @@
-# Insider Scan  
-**Insider trading scanner (OpenInsider / SecForm4 / SEC EDGAR)**
+# Insider Scanner
 
-An informational tool (Python 3.11+) for discovering and aggregating insider trading transactions for a list of companies over a specified time range.  
-Data is collected from aggregators (**OpenInsider**, **SecForm4**) and **validated / enriched with links from SEC EDGAR**, which is treated as the reference (“source of truth”) for filings.
-
-The project runs locally, requires no API keys, and respects SEC rate limits and access rules.
+Scan insider trades from **secform4.com**, **openinsider.com**, and **SEC EDGAR**. Includes Congress member trade flagging, multi-source deduplication, filtering, and a desktop GUI with EDGAR filing links.
 
 ---
 
-## ✨ Features
-
-- ✅ Multiple data sources:
-  - **SecForm4** (CIK-based, stable)
-  - **OpenInsider** (optional, best-effort)
-- ✅ Centralized configuration via **`config.yaml`**
-- ✅ Ability to **enable/disable individual sources**
-- ✅ Automatic **ticker → CIK → Form 4 (SEC EDGAR)** mapping
-- ✅ Transaction deduplication (hash + fuzzy merge)
-- ✅ Match quality assessment (`confidence: HIGH / MED / LOW`)
-- ✅ CLI + **Streamlit** dashboard
-- ✅ HTTP cache + throttling + retries
-- ✅ No dependency on paid APIs
-
----
-
-## 📁 Project Structure
-
-```
-
-insider-scan/
-├─ config.yaml               # run configuration (tickers, sources)
-├─ pyproject.toml
-├─ README.md
-├─ app.py                    # Streamlit dashboard
-└─ src/
-└─ insider_scan/
-├─ **main**.py         # python -m insider_scan
-├─ cli.py              # CLI pipeline
-├─ config.py           # HTTP / UA / throttling
-├─ settings.py         # YAML loader
-├─ merge.py            # deduplication and merging
-├─ models.py           # TransactionRecord
-└─ sources/
-├─ openinsider.py
-├─ secform4.py
-└─ sec_edgar.py
-
-````
-
----
-
-## ⚙️ Configuration (`config.yaml`)
-
-The `config.yaml` file in the project root controls the application behavior.
-
-### Example:
-
-```yaml
-sources:
-  openinsider: false
-  secform4: true
-
-tickers:
-  - AAPL
-  - TSLA
-  - PLTR
-  - AVXL
-
-sec:
-  user_agent: "InsiderScan/0.1 (contact: you@example.com)"
-  throttle_s: 0.35
-  timeout_s: 20
-````
-
-### Meaning:
-
-* `sources.openinsider` – enable/disable OpenInsider
-* `sources.secform4` – enable/disable SecForm4
-* `tickers` – default list of tickers
-* `sec.*` – optional overrides for HTTP settings (recommended)
-
-> ⚠️ **SEC requires an identifiable User-Agent** (with an email address).
-> It is also recommended to set the environment variable:
->
-> ```bash
-> export SEC_USER_AGENT="Your Name your@email.com"
-> ```
-
----
-
-## 🧪 Installation
+## Setup
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
-
-pip install -U pip
-pip install -e .
+git clone <repo-url>
+cd insider-scanner
+pip install -e ".[dev]"
 ```
+
+### Requirements
+
+Python 3.11+. Dependencies: `requests`, `beautifulsoup4`, `lxml`, `pandas`, `PySide6`.
 
 ---
 
-## ▶️ Running the CLI
+## Usage
 
-### Default (tickers and sources from `config.yaml`)
+### GUI
 
 ```bash
-python -m insider_scan --start 2025-12-01
+insider-scanner
+# or
+python -m insider_scanner.main
 ```
 
-### Override tickers from the CLI
+The GUI provides:
+
+- **Ticker search**: Enter a ticker and scan secform4.com + openinsider.com simultaneously
+- **Latest trades**: Fetch recent insider trades across all tickers
+- **Source selection**: Toggle secform4 and/or openinsider sources
+- **Filters**: By trade type (Buy/Sell/Exercise), minimum dollar value, Congress-only
+- **Results table**: Sortable columns, Congress trades highlighted in red
+- **EDGAR links**: Double-click a trade → view details, click "Open EDGAR Filing" to verify on SEC.gov
+- **CIK resolver**: Resolve any ticker to its SEC CIK number and open the filings page
+- **Export**: Save scan results as CSV + JSON
+
+### CLI
 
 ```bash
-python -m insider_scan --start 2025-12-01 --tickers AAPL TSLA
-```
+# Scan a specific ticker
+insider-scanner-cli scan AAPL
+insider-scanner-cli scan AAPL --type Buy --min-value 1000000 --save
 
-### What the CLI does:
+# Fetch latest insider trades
+insider-scanner-cli latest --count 50 --save
 
-* collects data from enabled sources,
-* enriches records with **SEC EDGAR** links,
-* deduplicates transactions,
-* prints `df.head(20)` + basic statistics,
-* saves a CSV file to:
+# Resolve SEC CIK
+insider-scanner-cli cik AAPL
 
-```
-outputs/insider_YYYYMMDD_HHMMSS.csv
+# Initialize default Congress member list
+insider-scanner-cli init-congress
+
+# Congress-only filter
+insider-scanner-cli scan AAPL --congress-only
 ```
 
 ---
 
-## 📊 Streamlit Dashboard
+## Architecture
+
+```
+src/insider_scanner/
+├── core/
+│   ├── models.py        # InsiderTrade dataclass (unified record)
+│   ├── secform4.py      # secform4.com HTML parser + scraper
+│   ├── openinsider.py   # openinsider.com HTML parser + scraper
+│   ├── edgar.py         # SEC EDGAR CIK resolver + filing URLs
+│   ├── senate.py        # Congress member list + trade flagging
+│   └── merger.py        # Multi-source dedup, filtering, export
+├── gui/
+│   ├── main_window.py   # Main window (default OS style)
+│   ├── scan_tab.py      # Search, filters, results table, EDGAR links
+│   └── widgets.py       # Pandas table model with Congress highlighting
+├── utils/
+│   ├── config.py        # Paths, SEC compliance constants
+│   ├── logging.py       # Logging setup
+│   ├── caching.py       # File-based cache with TTL expiry
+│   ├── http.py          # Rate-limited HTTP with SEC User-Agent
+│   └── threading.py     # Background worker for GUI
+├── main.py              # GUI entry point
+└── cli.py               # CLI entry point
+```
+
+### Data Flow
+
+1. **Scrape**: `secform4.py` and `openinsider.py` parse HTML tables into `InsiderTrade` records
+2. **Cache**: HTTP responses are cached locally with configurable TTL (default 1h)
+3. **Merge**: `merger.py` deduplicates trades across sources (matching by ticker + name + date + share count)
+4. **Flag**: `senate.py` checks insider names against the Congress member list (fuzzy matching)
+5. **Verify**: `edgar.py` generates SEC EDGAR filing URLs for any trade (opens in browser)
+6. **Export**: Results saved as CSV + JSON to `outputs/scans/`
+
+### SEC EDGAR Compliance
+
+All EDGAR requests use a proper `User-Agent` header and are rate-limited to 10 requests/second as required by SEC policy. The User-Agent is configurable via the `SEC_USER_AGENT` environment variable.
+
+---
+
+## Data Files
+
+| File | Description |
+|------|-------------|
+| `data/congress_members.json` | Congress member list for trade flagging (editable) |
+| `data/tickers_watchlist.txt` | Default ticker symbols |
+
+The Congress member list ships with 8 well-known trading Congress members and can be edited or extended.
+
+**Limitation**: Family member financial disclosures (spouses, children) are not publicly machine-readable and would require paid data services. This is a known limitation documented here.
+
+---
+
+## Tests
 
 ```bash
-streamlit run app.py
+# Run all offline tests (default)
+pytest -m "not live" -v
+
+# Run only live integration tests (requires internet)
+pytest -m live -v
+
+# Run everything
+pytest -v
+
+# With coverage
+pytest -m "not live" --cov=insider_scanner -v
 ```
 
-### Dashboard features:
+Tests are split into two categories:
 
-* filters:
-
-  * ticker
-  * insider role
-  * date range
-  * minimum transaction value
-  * data source
-* sortable results table
-* **Details** panel:
-
-  * SEC EDGAR link
-  * source link
-* transaction count over time chart
-* CSV export
-
-The dashboard:
-
-* loads the most recent CSV from `outputs/`,
-* uses default tickers and source toggles from `config.yaml`,
-* allows switching sources via checkboxes.
+- **Offline (mocked)**: Use the `responses` library to mock HTTP calls. No internet needed. Run by default in CI.
+- **Live integration**: Hit real websites. Marked with `@pytest.mark.live`. Excluded from CI. Run manually with `-m live`.
 
 ---
 
-## 🔍 Confidence (`HIGH / MED / LOW`)
+## CI/CD
 
-* **HIGH**
+GitHub Actions runs on push/PR:
 
-  * direct link to a specific Form 4 filing in SEC EDGAR
-  * ticker and date alignment
-* **MED**
-
-  * matched by date within the company CIK submissions
-* **LOW**
-
-  * no unambiguous filing link (aggregator-only data)
+- **Test matrix**: Python 3.11 + 3.12 on Ubuntu + Windows
+- **Offline tests only**: Live tests excluded via `-m "not live"`
+- **Lint**: `ruff check` on `src/` and `tests/`
+- **Coverage**: Uploaded as artifact for Python 3.12 Ubuntu
 
 ---
 
-## 🧠 Deduplication
+## Adding Sources
 
-One transaction = one record.
+To add a new scraping source:
 
-* `event_id = sha1(ticker | insider | trade_date | shares | price | type | source)`
-* fuzzy merge on:
-
-  * `ticker`
-  * `insider`
-  * `trade_date ± 1 day`
-  * `shares (rounded)`
-* preference order:
-
-  1. record with SEC link
-  2. higher `confidence`
+1. Create `src/insider_scanner/core/newsource.py` with a `scrape_ticker(ticker) -> list[InsiderTrade]` function
+2. Have the parser return `InsiderTrade` records with `source="newsource"`
+3. Add it to the merger pipeline in `scan_tab.py` and `cli.py`
+4. Write mocked tests in `tests/test_newsource.py`
 
 ---
 
-## 🛡️ Stability and Compliance
+## License
 
-* OpenInsider is treated as **best-effort**
-
-  * connection refusals, 403, or 429 responses are possible
-  * the pipeline **continues without it**
-* SecForm4:
-
-  * uses **CIK-based URLs**, not tickers
-  * table parsing via `pandas.read_html`
-* SEC EDGAR:
-
-  * throttling
-  * caching
-  * compliant User-Agent usage
-
----
-
-## ⚠️ Limitations
-
-* This tool **is not investment advice**
-* Aggregators may contain errors or delays
-* SEC may temporarily restrict access under heavy load
-* Source HTML structures may change over time (parsers are defensive)
-* Not all transaction types present themselves properly
-
----
-
-## 🔧 Extending the Project
-
-To add a new source:
-
-1. Add a new file under `sources/`
-2. Return `list[TransactionRecord]`
-3. Wire it into `cli.py`
-4. Merging and the dashboard will work automatically
-
----
-
-## ✅ Project Status
-
-* Core pipeline: **stable**
-* SecForm4 + SEC EDGAR: **production-ready**
-* OpenInsider: **optional / unstable**
-
----
-
-**Author:** LCZ
-**Purpose:** monitoring and analysis of insider activity (research / due diligence)
-
----
+MIT
