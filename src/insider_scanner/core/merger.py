@@ -119,6 +119,7 @@ def filter_trades(
     min_value: float | None = None,
     congress_only: bool = False,
     since: date | None = None,
+    until: date | None = None,
 ) -> list[InsiderTrade]:
     """Filter trades by various criteria.
 
@@ -136,6 +137,8 @@ def filter_trades(
         If True, only return congress-flagged trades.
     since : date or None
         Only return trades on or after this date.
+    until : date or None
+        Only return trades on or before this date.
 
     Returns
     -------
@@ -153,6 +156,8 @@ def filter_trades(
         result = [t for t in result if t.is_congress]
     if since:
         result = [t for t in result if t.trade_date and t.trade_date >= since]
+    if until:
+        result = [t for t in result if t.trade_date and t.trade_date <= until]
 
     return result
 

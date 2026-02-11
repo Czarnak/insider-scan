@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import webbrowser
+from datetime import date
 
 import pandas as pd
-from PySide6.QtCore import Qt, QThreadPool, Slot
+from PySide6.QtCore import Qt, QDate, QThreadPool, Slot
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDateEdit,
     QDoubleSpinBox,
     QGroupBox,
     QHBoxLayout,
@@ -63,7 +65,7 @@ class ScanTab(QWidget):
         search_l.addStretch()
         root.addWidget(search_grp)
 
-        # --- Source + filter controls ---
+        # --- Source + date range + filter controls ---
         filter_row = QHBoxLayout()
 
         # Sources
@@ -76,6 +78,33 @@ class ScanTab(QWidget):
         src_l.addWidget(self.chk_secform4)
         src_l.addWidget(self.chk_openinsider)
         filter_row.addWidget(src_grp)
+
+        # Date range
+        date_grp = QGroupBox("Date Range")
+        date_l = QHBoxLayout(date_grp)
+
+        self.chk_use_dates = QCheckBox("Enable")
+        self.chk_use_dates.setChecked(False)
+        self.chk_use_dates.toggled.connect(self._on_date_toggle)
+        date_l.addWidget(self.chk_use_dates)
+
+        date_l.addWidget(QLabel("Start:"))
+        self.start_date = QDateEdit()
+        self.start_date.setCalendarPopup(True)
+        self.start_date.setDisplayFormat("yyyy-MM-dd")
+        self.start_date.setDate(QDate.currentDate().addMonths(-6))
+        self.start_date.setEnabled(False)
+        date_l.addWidget(self.start_date)
+
+        date_l.addWidget(QLabel("End:"))
+        self.end_date = QDateEdit()
+        self.end_date.setCalendarPopup(True)
+        self.end_date.setDisplayFormat("yyyy-MM-dd")
+        self.end_date.setDate(QDate.currentDate())
+        self.end_date.setEnabled(False)
+        date_l.addWidget(self.end_date)
+
+        filter_row.addWidget(date_grp)
 
         # Filters
         filt_grp = QGroupBox("Filters")
@@ -165,6 +194,26 @@ class ScanTab(QWidget):
         root.addWidget(splitter, stretch=1)
 
     # ------------------------------------------------------------------
+    # Date range helpers
+    # ------------------------------------------------------------------
+
+    def _on_date_toggle(self, checked: bool):
+        self.start_date.setEnabled(checked)
+        self.end_date.setEnabled(checked)
+
+    def _get_start_date(self) -> date | None:
+        if not self.chk_use_dates.isChecked():
+            return None
+        qd = self.start_date.date()
+        return date(qd.year(), qd.month(), qd.day())
+
+    def _get_end_date(self) -> date | None:
+        if not self.chk_use_dates.isChecked():
+            return None
+        qd = self.end_date.date()
+        return date(qd.year(), qd.month(), qd.day())
+
+    # ------------------------------------------------------------------
     # Scan
     # ------------------------------------------------------------------
 
@@ -182,6 +231,8 @@ class ScanTab(QWidget):
 
         use_sf4 = self.chk_secform4.isChecked()
         use_oi = self.chk_openinsider.isChecked()
+        sd = self._get_start_date()
+        ed = self._get_end_date()
 
         def work():
             from insider_scanner.core.secform4 import scrape_ticker as sf4
@@ -191,9 +242,9 @@ class ScanTab(QWidget):
 
             lists = []
             if use_sf4:
-                lists.append(sf4(ticker))
+                lists.append(sf4(ticker, start_date=sd, end_date=ed))
             if use_oi:
-                lists.append(oi(ticker))
+                lists.append(oi(ticker, start_date=sd, end_date=ed))
 
             merged = merge_trades(*lists)
             flag_congress_trades(merged)
@@ -211,11 +262,14 @@ class ScanTab(QWidget):
         self.progress.setRange(0, 0)
         self.progress.setFormat("Fetching latest trades...")
 
+        sd = self._get_start_date()
+        ed = self._get_end_date()
+
         def work():
             from insider_scanner.core.openinsider import scrape_latest
             from insider_scanner.core.senate import flag_congress_trades
 
-            trades = scrape_latest(count=100)
+            trades = scrape_latest(count=100, start_date=sd, end_date=ed)
             flag_congress_trades(trades)
             return trades
 
@@ -288,6 +342,8 @@ class ScanTab(QWidget):
             trade_type=trade_type,
             min_value=min_val,
             congress_only=self.chk_congress.isChecked(),
+            since=self._get_start_date(),
+            until=self._get_end_date(),
         )
         self._display_trades(filtered)
 

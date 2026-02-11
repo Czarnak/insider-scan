@@ -60,7 +60,12 @@ def _classify_trade(text: str) -> str:
     return "Other"
 
 
-def scrape_ticker(ticker: str, use_cache: bool = True) -> list[InsiderTrade]:
+def scrape_ticker(
+    ticker: str,
+    use_cache: bool = True,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> list[InsiderTrade]:
     """Scrape insider trades for a specific ticker from openinsider.com.
 
     Parameters
@@ -69,12 +74,29 @@ def scrape_ticker(ticker: str, use_cache: bool = True) -> list[InsiderTrade]:
         Stock ticker symbol.
     use_cache : bool
         Whether to use the file cache.
+    start_date : date or None
+        Only include trades on or after this date.
+    end_date : date or None
+        Only include trades on or before this date.
 
     Returns
     -------
     list of InsiderTrade
     """
-    url = f"{BASE_URL}/screener?s={ticker.upper()}&o=&pl=&ph=&st=&lt=&lh=&fd=0&fdr=&td=0&tdr=&feession=&xp=1&vl=&vh=&ocl=&och=&session=&ession=&cnt=100"
+    # Build date range params for openinsider URL
+    td_param = "0"
+    tdr_param = ""
+    if start_date or end_date:
+        td_param = "7"  # custom range mode
+        sd = start_date.strftime("%m/%d/%Y") if start_date else "01/01/2000"
+        ed = end_date.strftime("%m/%d/%Y") if end_date else "12/31/2030"
+        tdr_param = f"{sd}+-+{ed}"
+
+    url = (
+        f"{BASE_URL}/screener?s={ticker.upper()}&o=&pl=&ph=&st=&lt=&lh="
+        f"&fd=0&fdr=&td={td_param}&tdr={tdr_param}"
+        f"&feession=&xp=1&vl=&vh=&ocl=&och=&session=&ession=&cnt=100"
+    )
     cache_dir = SCRAPER_CACHE_DIR if use_cache else None
 
     try:
@@ -86,7 +108,12 @@ def scrape_ticker(ticker: str, use_cache: bool = True) -> list[InsiderTrade]:
     return parse_openinsider_html(html, ticker)
 
 
-def scrape_latest(count: int = 100, use_cache: bool = True) -> list[InsiderTrade]:
+def scrape_latest(
+    count: int = 100,
+    use_cache: bool = True,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> list[InsiderTrade]:
     """Scrape the latest insider trades across all tickers.
 
     Parameters
@@ -95,12 +122,28 @@ def scrape_latest(count: int = 100, use_cache: bool = True) -> list[InsiderTrade
         Number of recent trades to fetch.
     use_cache : bool
         Whether to use the file cache.
+    start_date : date or None
+        Only include trades on or after this date.
+    end_date : date or None
+        Only include trades on or before this date.
 
     Returns
     -------
     list of InsiderTrade
     """
-    url = f"{BASE_URL}/screener?s=&o=&pl=&ph=&st=&lt=&lh=&fd=0&fdr=&td=0&tdr=&feession=&xp=1&vl=&vh=&ocl=&och=&session=&ession=&cnt={count}"
+    td_param = "0"
+    tdr_param = ""
+    if start_date or end_date:
+        td_param = "7"
+        sd = start_date.strftime("%m/%d/%Y") if start_date else "01/01/2000"
+        ed = end_date.strftime("%m/%d/%Y") if end_date else "12/31/2030"
+        tdr_param = f"{sd}+-+{ed}"
+
+    url = (
+        f"{BASE_URL}/screener?s=&o=&pl=&ph=&st=&lt=&lh="
+        f"&fd=0&fdr=&td={td_param}&tdr={tdr_param}"
+        f"&feession=&xp=1&vl=&vh=&ocl=&och=&session=&ession=&cnt={count}"
+    )
     cache_dir = SCRAPER_CACHE_DIR if use_cache else None
 
     try:

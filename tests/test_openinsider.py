@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import responses
 
 from insider_scanner.core.openinsider import parse_openinsider_html, scrape_ticker, scrape_latest
@@ -85,3 +87,40 @@ class TestScrapeOpeninsider:
         )
         trades = scrape_ticker("AAPL", use_cache=False)
         assert trades == []
+
+    @responses.activate
+    def test_scrape_with_date_range_url(self):
+        """Verify that date params produce a custom date range in the URL."""
+        responses.add(
+            responses.GET,
+            "http://openinsider.com/screener",
+            body=OPENINSIDER_HTML,
+            status=200,
+        )
+        trades = scrape_ticker(
+            "AAPL", use_cache=False,
+            start_date=date(2025, 6, 1),
+            end_date=date(2025, 12, 31),
+        )
+        # Verify request was made with date range params
+        assert len(responses.calls) == 1
+        url = responses.calls[0].request.url
+        assert "td=7" in url  # custom range mode
+        assert "06%2F01%2F2025" in url or "06/01/2025" in url
+        assert len(trades) >= 1
+
+    @responses.activate
+    def test_scrape_latest_with_dates(self):
+        responses.add(
+            responses.GET,
+            "http://openinsider.com/screener",
+            body=OPENINSIDER_HTML,
+            status=200,
+        )
+        trades = scrape_latest(
+            count=50, use_cache=False,
+            start_date=date(2025, 1, 1),
+        )
+        assert len(trades) >= 1
+        url = responses.calls[0].request.url
+        assert "td=7" in url

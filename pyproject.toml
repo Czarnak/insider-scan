@@ -17,6 +17,7 @@ dependencies = [
     "lxml>=4.9",
     "pandas>=2.1",
     "PySide6>=6.6",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]

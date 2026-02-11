@@ -67,7 +67,12 @@ def _classify_trade(text: str) -> str:
     return "Other"
 
 
-def scrape_ticker(ticker: str, use_cache: bool = True) -> list[InsiderTrade]:
+def scrape_ticker(
+    ticker: str,
+    use_cache: bool = True,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> list[InsiderTrade]:
     """Scrape insider trades for a specific ticker from secform4.com.
 
     Parameters
@@ -76,6 +81,10 @@ def scrape_ticker(ticker: str, use_cache: bool = True) -> list[InsiderTrade]:
         Stock ticker symbol (e.g. "AAPL").
     use_cache : bool
         Whether to use the file cache.
+    start_date : date or None
+        Only include trades on or after this date.
+    end_date : date or None
+        Only include trades on or before this date.
 
     Returns
     -------
@@ -90,7 +99,15 @@ def scrape_ticker(ticker: str, use_cache: bool = True) -> list[InsiderTrade]:
         log.warning("Failed to fetch %s: %s", url, exc)
         return []
 
-    return parse_secform4_html(html, ticker)
+    trades = parse_secform4_html(html, ticker)
+
+    # Post-filter by date (secform4 doesn't support date params in URL)
+    if start_date:
+        trades = [t for t in trades if t.trade_date and t.trade_date >= start_date]
+    if end_date:
+        trades = [t for t in trades if t.trade_date and t.trade_date <= end_date]
+
+    return trades
 
 
 def parse_secform4_html(html: str, ticker: str = "") -> list[InsiderTrade]:

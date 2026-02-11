@@ -8,3 +8,14 @@ cache/
 outputs/
 *.egg
 .venv/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.log
+*.bak
+logs/
+.idea/
+.vscode/
+api_key.py
+data/congress_members.json

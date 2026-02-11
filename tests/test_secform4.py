@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import responses
 
 from insider_scanner.core.secform4 import parse_secform4_html, scrape_ticker
@@ -79,3 +81,45 @@ class TestScrapeSecform4:
         )
         trades = scrape_ticker("FAIL", use_cache=False)
         assert trades == []
+
+    @responses.activate
+    def test_scrape_with_start_date(self):
+        responses.add(
+            responses.GET,
+            "https://www.secform4.com/AAPL.htm",
+            body=SECFORM4_HTML,
+            status=200,
+        )
+        trades = scrape_ticker("AAPL", use_cache=False, start_date=date(2025, 11, 1))
+        # Only Nov trades should pass (Cook 11/15, Williams 11/10)
+        assert all(t.trade_date >= date(2025, 11, 1) for t in trades)
+        assert len(trades) == 2
+
+    @responses.activate
+    def test_scrape_with_end_date(self):
+        responses.add(
+            responses.GET,
+            "https://www.secform4.com/AAPL.htm",
+            body=SECFORM4_HTML,
+            status=200,
+        )
+        trades = scrape_ticker("AAPL", use_cache=False, end_date=date(2025, 10, 1))
+        # Only Maestri (10/01) and Pelosi (09/20)
+        assert all(t.trade_date <= date(2025, 10, 1) for t in trades)
+        assert len(trades) == 2
+
+    @responses.activate
+    def test_scrape_with_date_range(self):
+        responses.add(
+            responses.GET,
+            "https://www.secform4.com/AAPL.htm",
+            body=SECFORM4_HTML,
+            status=200,
+        )
+        trades = scrape_ticker(
+            "AAPL", use_cache=False,
+            start_date=date(2025, 10, 1),
+            end_date=date(2025, 11, 10),
+        )
+        # Maestri 10/01, Williams 11/10
+        assert len(trades) == 2

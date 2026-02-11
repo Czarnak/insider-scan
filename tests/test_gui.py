@@ -57,6 +57,50 @@ class TestScanTab:
         tab.ticker_edit.setText("")
         # _run_scan shows a warning but doesn't crash
 
+    def test_date_widgets_exist(self, qtbot):
+        from insider_scanner.gui.scan_tab import ScanTab
+        tab = ScanTab()
+        qtbot.addWidget(tab)
+        assert tab.start_date is not None
+        assert tab.end_date is not None
+        assert tab.chk_use_dates is not None
+
+    def test_date_toggle_enables_fields(self, qtbot):
+        from insider_scanner.gui.scan_tab import ScanTab
+        tab = ScanTab()
+        qtbot.addWidget(tab)
+        # Initially disabled
+        assert not tab.start_date.isEnabled()
+        assert not tab.end_date.isEnabled()
+        # Enable
+        tab.chk_use_dates.setChecked(True)
+        assert tab.start_date.isEnabled()
+        assert tab.end_date.isEnabled()
+        # Disable again
+        tab.chk_use_dates.setChecked(False)
+        assert not tab.start_date.isEnabled()
+        assert not tab.end_date.isEnabled()
+
+    def test_get_dates_disabled(self, qtbot):
+        from insider_scanner.gui.scan_tab import ScanTab
+        tab = ScanTab()
+        qtbot.addWidget(tab)
+        # When dates unchecked, helpers return None
+        assert tab._get_start_date() is None
+        assert tab._get_end_date() is None
+
+    def test_get_dates_enabled(self, qtbot):
+        from datetime import date
+        from PySide6.QtCore import QDate
+        from insider_scanner.gui.scan_tab import ScanTab
+        tab = ScanTab()
+        qtbot.addWidget(tab)
+        tab.chk_use_dates.setChecked(True)
+        tab.start_date.setDate(QDate(2025, 3, 15))
+        tab.end_date.setDate(QDate(2025, 9, 30))
+        assert tab._get_start_date() == date(2025, 3, 15)
+        assert tab._get_end_date() == date(2025, 9, 30)
+
 
 class TestMainWindow:
     def test_create(self, qtbot):

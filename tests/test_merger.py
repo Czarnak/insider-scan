@@ -111,6 +111,25 @@ class TestFilterTrades:
         result = filter_trades(trades, since=date(2025, 6, 1))
         assert len(result) == 2
 
+    def test_filter_until_date(self):
+        trades = [
+            _trade(trade_date=date(2025, 1, 1)),
+            _trade(ticker="MSFT", name="N", trade_date=date(2025, 6, 1)),
+            _trade(ticker="TSLA", name="T", trade_date=date(2025, 12, 1)),
+        ]
+        result = filter_trades(trades, until=date(2025, 6, 1))
+        assert len(result) == 2
+
+    def test_filter_date_range(self):
+        trades = [
+            _trade(trade_date=date(2025, 1, 1)),
+            _trade(ticker="MSFT", name="N", trade_date=date(2025, 6, 1)),
+            _trade(ticker="TSLA", name="T", trade_date=date(2025, 12, 1)),
+        ]
+        result = filter_trades(trades, since=date(2025, 3, 1), until=date(2025, 9, 1))
+        assert len(result) == 1
+        assert result[0].ticker == "MSFT"
+
     def test_combined_filters(self):
         result = filter_trades(
             self._trades(),
