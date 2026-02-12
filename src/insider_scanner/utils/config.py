@@ -49,3 +49,21 @@ def ensure_dirs() -> None:
         DATA_DIR,
     ):
         d.mkdir(parents=True, exist_ok=True)
+
+
+def load_watchlist(path: Path | None = None) -> list[str]:
+    """Load ticker symbols from the watchlist file.
+
+    Returns a list of uppercase ticker strings, skipping blank lines
+    and comments (lines starting with #).
+    """
+    p = path or TICKERS_FILE
+    if not p.exists():
+        return []
+
+    tickers = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            tickers.append(line.upper())
+    return tickers

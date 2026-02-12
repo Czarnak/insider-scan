@@ -37,12 +37,12 @@ sys.path.insert(0, str(_project_root / "src"))
 import requests
 
 FEDERAL_URL = (
-    "https://unitedstates.github.io/congress-legislators/legislators-current.yaml"
-    #"congress-legislators/refs/heads/main/legislators-current.yaml"
+    "https://raw.githubusercontent.com/unitedstates/"
+    "congress-legislators/main/legislators-current.yaml"
 )
 FEDERAL_FALLBACK_URL = (
-    "https://unitedstates.github.io/congress-legislators/legislators-current.json"
-    #"congress-legislators/refs/heads/main/legislators-current.json"
+    "https://raw.githubusercontent.com/unitedstates/"
+    "congress-legislators/main/legislators-current.json"
 )
 OPENSTATES_PEOPLE_URL = "https://v3.openstates.org/people"
 
@@ -327,7 +327,7 @@ Examples:
     # Fetch state (optional)
     state = []
     if args.include_state:
-        api_key = os.environ.get("OPENSTATES_API_KEY")
+        api_key = os.environ.get("OPENSTATES_API_KEY", "")
         if not api_key:
             print(
                 "\nWARNING: OPENSTATES_API_KEY not set. Skipping state legislators.\n"

@@ -101,6 +101,42 @@ class TestScanTab:
         assert tab._get_start_date() == date(2025, 3, 15)
         assert tab._get_end_date() == date(2025, 9, 30)
 
+    def test_latest_count_spin_exists(self, qtbot):
+        from insider_scanner.gui.scan_tab import ScanTab
+        tab = ScanTab()
+        qtbot.addWidget(tab)
+        assert tab.latest_count_spin is not None
+        assert tab.latest_count_spin.value() == 100
+        assert tab.latest_count_spin.minimum() == 10
+        assert tab.latest_count_spin.maximum() == 500
+
+    def test_latest_count_spin_change(self, qtbot):
+        from insider_scanner.gui.scan_tab import ScanTab
+        tab = ScanTab()
+        qtbot.addWidget(tab)
+        tab.latest_count_spin.setValue(250)
+        assert tab.latest_count_spin.value() == 250
+
+    def test_watchlist_button_exists(self, qtbot):
+        from insider_scanner.gui.scan_tab import ScanTab
+        tab = ScanTab()
+        qtbot.addWidget(tab)
+        assert tab.btn_watchlist is not None
+        assert tab.btn_watchlist.isEnabled()
+
+    def test_set_scan_buttons_enabled(self, qtbot):
+        from insider_scanner.gui.scan_tab import ScanTab
+        tab = ScanTab()
+        qtbot.addWidget(tab)
+        tab._set_scan_buttons_enabled(False)
+        assert not tab.btn_scan.isEnabled()
+        assert not tab.btn_latest.isEnabled()
+        assert not tab.btn_watchlist.isEnabled()
+        tab._set_scan_buttons_enabled(True)
+        assert tab.btn_scan.isEnabled()
+        assert tab.btn_latest.isEnabled()
+        assert tab.btn_watchlist.isEnabled()
+
 
 class TestMainWindow:
     def test_create(self, qtbot):

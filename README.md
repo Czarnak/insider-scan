@@ -31,7 +31,8 @@ python -m insider_scanner.main
 The GUI provides:
 
 - **Ticker search**: Enter a ticker and scan secform4.com + openinsider.com simultaneously
-- **Latest trades**: Fetch recent insider trades across all tickers
+- **Latest trades**: Fetch recent insider trades across all tickers, with configurable count (10–500)
+- **Watchlist scan**: One-click scan of all tickers in `data/tickers_watchlist.txt` — results merged and deduplicated
 - **Source selection**: Toggle secform4 and/or openinsider sources
 - **Date range**: Optional start/end date pickers with calendar popups — passed to scrapers and applied as filters
 - **Filters**: By trade type (Buy/Sell/Exercise), minimum dollar value, Congress-only

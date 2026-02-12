@@ -62,6 +62,20 @@ class ScanTab(QWidget):
         self.btn_latest.clicked.connect(self._run_latest)
         search_l.addWidget(self.btn_latest)
 
+        search_l.addWidget(QLabel("Count:"))
+        self.latest_count_spin = QSpinBox()
+        self.latest_count_spin.setRange(10, 500)
+        self.latest_count_spin.setValue(100)
+        self.latest_count_spin.setSingleStep(10)
+        self.latest_count_spin.setMaximumWidth(80)
+        self.latest_count_spin.setToolTip("Number of latest trades to fetch")
+        search_l.addWidget(self.latest_count_spin)
+
+        self.btn_watchlist = QPushButton("Watchlist Scan")
+        self.btn_watchlist.clicked.connect(self._run_watchlist)
+        self.btn_watchlist.setToolTip("Scan all tickers in data/tickers_watchlist.txt")
+        search_l.addWidget(self.btn_watchlist)
+
         search_l.addStretch()
         root.addWidget(search_grp)
 
@@ -217,14 +231,19 @@ class ScanTab(QWidget):
     # Scan
     # ------------------------------------------------------------------
 
+    def _set_scan_buttons_enabled(self, enabled: bool):
+        """Enable or disable all scan-triggering buttons."""
+        self.btn_scan.setEnabled(enabled)
+        self.btn_latest.setEnabled(enabled)
+        self.btn_watchlist.setEnabled(enabled)
+
     def _run_scan(self):
         ticker = self.ticker_edit.text().strip().upper()
         if not ticker:
             QMessageBox.warning(self, "Input", "Enter a ticker symbol.")
             return
 
-        self.btn_scan.setEnabled(False)
-        self.btn_latest.setEnabled(False)
+        self._set_scan_buttons_enabled(False)
         self.progress.setVisible(True)
         self.progress.setRange(0, 0)
         self.progress.setFormat(f"Scanning {ticker}...")
@@ -256,22 +275,71 @@ class ScanTab(QWidget):
         QThreadPool.globalInstance().start(worker)
 
     def _run_latest(self):
-        self.btn_scan.setEnabled(False)
-        self.btn_latest.setEnabled(False)
+        self._set_scan_buttons_enabled(False)
         self.progress.setVisible(True)
         self.progress.setRange(0, 0)
         self.progress.setFormat("Fetching latest trades...")
 
         sd = self._get_start_date()
         ed = self._get_end_date()
+        count = self.latest_count_spin.value()
 
         def work():
             from insider_scanner.core.openinsider import scrape_latest
             from insider_scanner.core.senate import flag_congress_trades
 
-            trades = scrape_latest(count=100, start_date=sd, end_date=ed)
+            trades = scrape_latest(count=count, start_date=sd, end_date=ed)
             flag_congress_trades(trades)
             return trades
+
+        worker = Worker(work)
+        worker.signals.result.connect(self._on_scan_done)
+        worker.signals.error.connect(self._on_scan_error)
+        QThreadPool.globalInstance().start(worker)
+
+    def _run_watchlist(self):
+        from insider_scanner.utils.config import load_watchlist
+
+        tickers = load_watchlist()
+        if not tickers:
+            QMessageBox.warning(
+                self, "Watchlist",
+                "No tickers found in data/tickers_watchlist.txt",
+            )
+            return
+
+        self._set_scan_buttons_enabled(False)
+        self.progress.setVisible(True)
+        self.progress.setRange(0, len(tickers))
+        self.progress.setValue(0)
+        self.progress.setFormat("Watchlist: %v/%m tickers scanned")
+
+        use_sf4 = self.chk_secform4.isChecked()
+        use_oi = self.chk_openinsider.isChecked()
+        sd = self._get_start_date()
+        ed = self._get_end_date()
+
+        def work():
+            from insider_scanner.core.secform4 import scrape_ticker as sf4
+            from insider_scanner.core.openinsider import scrape_ticker as oi
+            from insider_scanner.core.merger import merge_trades
+            from insider_scanner.core.senate import flag_congress_trades
+
+            all_lists = []
+            for i, ticker in enumerate(tickers):
+                lists = []
+                if use_sf4:
+                    lists.append(sf4(ticker, start_date=sd, end_date=ed))
+                if use_oi:
+                    lists.append(oi(ticker, start_date=sd, end_date=ed))
+                all_lists.extend(lists)
+                # Update progress on the main thread via a signal would be
+                # ideal, but QThreadPool workers can't easily emit per-tick.
+                # Instead we set it after completion in _on_scan_done.
+
+            merged = merge_trades(*all_lists)
+            flag_congress_trades(merged)
+            return merged
 
         worker = Worker(work)
         worker.signals.result.connect(self._on_scan_done)
@@ -282,16 +350,14 @@ class ScanTab(QWidget):
     def _on_scan_done(self, trades):
         self._trades = trades
         self.progress.setVisible(False)
-        self.btn_scan.setEnabled(True)
-        self.btn_latest.setEnabled(True)
+        self._set_scan_buttons_enabled(True)
         self.btn_save.setEnabled(True)
         self._display_trades(trades)
 
     @Slot(tuple)
     def _on_scan_error(self, error_info):
         self.progress.setVisible(False)
-        self.btn_scan.setEnabled(True)
-        self.btn_latest.setEnabled(True)
+        self._set_scan_buttons_enabled(True)
         exc_type, exc_value, _ = error_info
         QMessageBox.critical(self, "Scan Error", f"{exc_type.__name__}: {exc_value}")
 
