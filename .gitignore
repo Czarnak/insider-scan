@@ -8,3 +8,7 @@ cache/
 outputs/
 *.egg
 .venv/
+.idea/
+api_key.py
+logs/
+data/

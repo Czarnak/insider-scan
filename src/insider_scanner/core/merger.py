@@ -56,7 +56,7 @@ def _richness_score(trade: InsiderTrade) -> int:
 
 
 def merge_trades(
-    *trade_lists: list[InsiderTrade],
+        *trade_lists: list[InsiderTrade],
 ) -> list[InsiderTrade]:
     """Merge and deduplicate trades from multiple sources.
 
@@ -112,14 +112,14 @@ def merge_trades(
 
 
 def filter_trades(
-    trades: list[InsiderTrade],
-    *,
-    ticker: str | None = None,
-    trade_type: str | None = None,
-    min_value: float | None = None,
-    congress_only: bool = False,
-    since: date | None = None,
-    until: date | None = None,
+        trades: list[InsiderTrade],
+        *,
+        ticker: str | None = None,
+        trade_type: str | None = None,
+        min_value: float | None = None,
+        congress_only: bool = False,
+        since: date | None = None,
+        until: date | None = None,
 ) -> list[InsiderTrade]:
     """Filter trades by various criteria.
 
@@ -170,9 +170,9 @@ def trades_to_dataframe(trades: list[InsiderTrade]) -> pd.DataFrame:
 
 
 def save_scan_results(
-    trades: list[InsiderTrade],
-    label: str = "scan",
-    output_dir: Path | None = None,
+        trades: list[InsiderTrade],
+        label: str = "scan",
+        output_dir: Path | None = None,
 ) -> Path:
     """Save scan results as CSV and JSON.
 

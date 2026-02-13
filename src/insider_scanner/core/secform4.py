@@ -68,10 +68,10 @@ def _classify_trade(text: str) -> str:
 
 
 def scrape_ticker(
-    ticker: str,
-    use_cache: bool = True,
-    start_date: date | None = None,
-    end_date: date | None = None,
+        ticker: str,
+        use_cache: bool = True,
+        start_date: date | None = None,
+        end_date: date | None = None,
 ) -> list[InsiderTrade]:
     """Scrape insider trades for a specific ticker from secform4.com.
 
