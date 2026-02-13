@@ -419,7 +419,6 @@ class ScanTab(QWidget):
     def _on_row_double_click(self, index):
         row = index.row()
         source_index = self.trades_model.mapToSource(index)
-        df = self.trades_model.dataframe
         if row < len(self._trades):
             trade = self._trades[source_index.row()]
             detail = (
@@ -434,7 +433,7 @@ class ScanTab(QWidget):
             self.btn_edgar.setEnabled(True)
 
     def _open_edgar(self):
-        # Get selected row
+        # Get the selected row
         indexes = self.trades_table.selectionModel().selectedRows()
         if not indexes:
             return

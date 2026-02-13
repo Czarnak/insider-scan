@@ -14,7 +14,6 @@ sys.path.insert(0, str(_scripts_dir))
 
 import update_congress  # noqa: E402
 
-
 SAMPLE_YAML = """
 - id:
     bioguide: A000001
