@@ -177,15 +177,15 @@ def parse_secform4_html(html: str, ticker: str = "") -> list[InsiderTrade]:
             col_map.setdefault("title", i)
         elif "transaction" in h or "type" in h:
             col_map.setdefault("type", i)
-        elif "date" in h and "filing" not in h:
+        elif "date" in h and "reported" not in h:
             col_map.setdefault("trade_date", i)
-        elif "filing" in h and "date" in h:
+        elif "reported" in h and "date" in h:
             col_map.setdefault("filing_date", i)
         elif "shares" in h and "owned" not in h:
             col_map.setdefault("shares", i)
         elif "price" in h:
             col_map.setdefault("price", i)
-        elif "value" in h:
+        elif "amount" in h:
             col_map.setdefault("value", i)
         elif "owned" in h:
             col_map.setdefault("owned_after", i)
