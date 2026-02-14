@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import webbrowser
 from datetime import date
+from threading import Event
 
 import pandas as pd
 from PySide6.QtCore import Qt, QDate, QThreadPool, Slot
@@ -23,6 +24,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QSplitter,
     QTableView,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -37,6 +39,7 @@ class ScanTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._trades: list = []
+        self._cancel_event = Event()
         self._build_ui()
 
     def _build_ui(self):
@@ -93,7 +96,7 @@ class ScanTab(QWidget):
         filter_row.addWidget(src_grp)
 
         # Date range
-        date_grp = QGroupBox("Date Range")
+        date_grp = QGroupBox("Filing Date Range")
         date_l = QHBoxLayout(date_grp)
 
         self.chk_use_dates = QCheckBox("Enable")
@@ -146,11 +149,20 @@ class ScanTab(QWidget):
         filter_row.addWidget(filt_grp)
         root.addLayout(filter_row)
 
-        # Progress
+        # Progress + Stop
+        progress_row = QHBoxLayout()
         self.progress = QProgressBar()
         self.progress.setVisible(False)
         self.progress.setTextVisible(True)
-        root.addWidget(self.progress)
+        progress_row.addWidget(self.progress)
+
+        self.btn_stop = QPushButton("Stop Scan")
+        self.btn_stop.setVisible(False)
+        self.btn_stop.clicked.connect(self._stop_scan)
+        self.btn_stop.setMaximumWidth(100)
+        progress_row.addWidget(self.btn_stop)
+
+        root.addLayout(progress_row)
 
         # --- Results ---
         splitter = QSplitter(Qt.Orientation.Vertical)
@@ -235,6 +247,14 @@ class ScanTab(QWidget):
         self.btn_scan.setEnabled(enabled)
         self.btn_latest.setEnabled(enabled)
         self.btn_watchlist.setEnabled(enabled)
+        # Stop button is opposite: visible when scanning
+        self.btn_stop.setVisible(not enabled)
+
+    def _stop_scan(self):
+        """Signal the running watchlist scan to stop."""
+        self._cancel_event.set()
+        self.btn_stop.setEnabled(False)
+        self.progress.setFormat("Stopping...")
 
     def _run_scan(self):
         ticker = self.ticker_edit.text().strip().upper()
@@ -307,6 +327,7 @@ class ScanTab(QWidget):
             )
             return
 
+        self._cancel_event.clear()
         self._set_scan_buttons_enabled(False)
         self.progress.setVisible(True)
         self.progress.setRange(0, len(tickers))
@@ -317,6 +338,7 @@ class ScanTab(QWidget):
         use_oi = self.chk_openinsider.isChecked()
         sd = self._get_start_date()
         ed = self._get_end_date()
+        cancel = self._cancel_event
 
         def work():
             from insider_scanner.core.secform4 import scrape_ticker as sf4
@@ -326,15 +348,14 @@ class ScanTab(QWidget):
 
             all_lists = []
             for i, ticker in enumerate(tickers):
+                if cancel.is_set():
+                    break
                 lists = []
                 if use_sf4:
                     lists.append(sf4(ticker, start_date=sd, end_date=ed))
                 if use_oi:
                     lists.append(oi(ticker, start_date=sd, end_date=ed))
                 all_lists.extend(lists)
-                # Update progress on the main thread via a signal would be
-                # ideal, but QThreadPool workers can't easily emit per-tick.
-                # Instead we set it after completion in _on_scan_done.
 
             merged = merge_trades(*all_lists)
             flag_congress_trades(merged)
@@ -347,15 +368,24 @@ class ScanTab(QWidget):
 
     @Slot(object)
     def _on_scan_done(self, trades):
+        cancelled = self._cancel_event.is_set()
+        self._cancel_event.clear()
         self._trades = trades
         self.progress.setVisible(False)
+        self.btn_stop.setEnabled(True)
         self._set_scan_buttons_enabled(True)
         self.btn_save.setEnabled(True)
         self._display_trades(trades)
+        if cancelled:
+            self.status_label.setText(
+                self.status_label.text() + "  (scan was cancelled)"
+            )
 
     @Slot(tuple)
     def _on_scan_error(self, error_info):
+        self._cancel_event.clear()
         self.progress.setVisible(False)
+        self.btn_stop.setEnabled(True)
         self._set_scan_buttons_enabled(True)
         exc_type, exc_value, _ = error_info
         QMessageBox.critical(self, "Scan Error", f"{exc_type.__name__}: {exc_value}")
@@ -366,6 +396,12 @@ class ScanTab(QWidget):
 
     def _display_trades(self, trades):
         from insider_scanner.core.merger import trades_to_dataframe
+        from insider_scanner.core.edgar import build_edgar_url_for_trade
+
+        # Auto-generate edgar_url for trades that don't have one
+        for trade in trades:
+            if not trade.edgar_url:
+                trade.edgar_url = build_edgar_url_for_trade(trade)
 
         df = trades_to_dataframe(trades)
         if df.empty:
@@ -376,9 +412,9 @@ class ScanTab(QWidget):
         # Select display columns
         display_cols = [
             c for c in [
-                "trade_date", "ticker", "insider_name", "insider_title",
-                "trade_type", "shares", "price", "value",
-                "is_congress", "source", "edgar_url",
+                "filing_date", "trade_date", "ticker", "insider_name",
+                "insider_title", "trade_type", "shares", "price", "value",
+                "source", "edgar_url",
             ]
             if c in df.columns
         ]
@@ -419,6 +455,7 @@ class ScanTab(QWidget):
     def _on_row_double_click(self, index):
         row = index.row()
         source_index = self.trades_model.mapToSource(index)
+        df = self.trades_model.dataframe
         if row < len(self._trades):
             trade = self._trades[source_index.row()]
             detail = (
@@ -433,7 +470,7 @@ class ScanTab(QWidget):
             self.btn_edgar.setEnabled(True)
 
     def _open_edgar(self):
-        # Get the selected row
+        # Get selected row
         indexes = self.trades_table.selectionModel().selectedRows()
         if not indexes:
             return

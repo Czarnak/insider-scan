@@ -4,25 +4,26 @@ from __future__ import annotations
 
 from datetime import date
 
+from insider_scanner.core.models import InsiderTrade
 from insider_scanner.core.merger import (
     merge_trades,
     filter_trades,
     trades_to_dataframe,
     save_scan_results,
 )
-from insider_scanner.core.models import InsiderTrade
 
 
 def _trade(
-        ticker="AAPL", name="Cook Timothy", trade_type="Sell",
-        trade_date=None, shares=100_000, price=185.0, value=18_500_000,
-        source="secform4", edgar_url="", is_congress=False,
+    ticker="AAPL", name="Cook Timothy", trade_type="Sell",
+    trade_date=None, filing_date=None, shares=100_000, price=185.0,
+    value=18_500_000, source="secform4", edgar_url="", is_congress=False,
 ) -> InsiderTrade:
     return InsiderTrade(
         ticker=ticker,
         insider_name=name,
         trade_type=trade_type,
         trade_date=trade_date or date(2025, 11, 15),
+        filing_date=filing_date or (trade_date or date(2025, 11, 15)),
         shares=shares,
         price=price,
         value=value,
@@ -104,27 +105,27 @@ class TestFilterTrades:
 
     def test_filter_since_date(self):
         trades = [
-            _trade(trade_date=date(2025, 1, 1)),
-            _trade(ticker="MSFT", name="N", trade_date=date(2025, 6, 1)),
-            _trade(ticker="TSLA", name="T", trade_date=date(2025, 12, 1)),
+            _trade(filing_date=date(2025, 1, 1)),
+            _trade(ticker="MSFT", name="N", filing_date=date(2025, 6, 1)),
+            _trade(ticker="TSLA", name="T", filing_date=date(2025, 12, 1)),
         ]
         result = filter_trades(trades, since=date(2025, 6, 1))
         assert len(result) == 2
 
     def test_filter_until_date(self):
         trades = [
-            _trade(trade_date=date(2025, 1, 1)),
-            _trade(ticker="MSFT", name="N", trade_date=date(2025, 6, 1)),
-            _trade(ticker="TSLA", name="T", trade_date=date(2025, 12, 1)),
+            _trade(filing_date=date(2025, 1, 1)),
+            _trade(ticker="MSFT", name="N", filing_date=date(2025, 6, 1)),
+            _trade(ticker="TSLA", name="T", filing_date=date(2025, 12, 1)),
         ]
         result = filter_trades(trades, until=date(2025, 6, 1))
         assert len(result) == 2
 
     def test_filter_date_range(self):
         trades = [
-            _trade(trade_date=date(2025, 1, 1)),
-            _trade(ticker="MSFT", name="N", trade_date=date(2025, 6, 1)),
-            _trade(ticker="TSLA", name="T", trade_date=date(2025, 12, 1)),
+            _trade(filing_date=date(2025, 1, 1)),
+            _trade(ticker="MSFT", name="N", filing_date=date(2025, 6, 1)),
+            _trade(ticker="TSLA", name="T", filing_date=date(2025, 12, 1)),
         ]
         result = filter_trades(trades, since=date(2025, 3, 1), until=date(2025, 9, 1))
         assert len(result) == 1
@@ -160,6 +161,6 @@ class TestTradesToDataframe:
 class TestSaveScanResults:
     def test_save_creates_files(self, tmp_path):
         trades = [_trade()]
-        save_scan_results(trades, label="test_scan", output_dir=tmp_path)
+        out = save_scan_results(trades, label="test_scan", output_dir=tmp_path)
         assert (tmp_path / "test_scan.csv").exists()
         assert (tmp_path / "test_scan.json").exists()

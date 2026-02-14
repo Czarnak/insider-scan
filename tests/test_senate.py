@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
+from pathlib import Path
 
 from insider_scanner.core.models import InsiderTrade
 from insider_scanner.core.senate import (

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import traceback
 
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 

@@ -132,10 +132,28 @@ class TestScanTab:
         assert not tab.btn_scan.isEnabled()
         assert not tab.btn_latest.isEnabled()
         assert not tab.btn_watchlist.isEnabled()
+        assert not tab.btn_stop.isHidden()  # stop visible when scanning
         tab._set_scan_buttons_enabled(True)
         assert tab.btn_scan.isEnabled()
         assert tab.btn_latest.isEnabled()
         assert tab.btn_watchlist.isEnabled()
+        assert tab.btn_stop.isHidden()  # stop hidden when idle
+
+    def test_stop_button_exists(self, qtbot):
+        from insider_scanner.gui.scan_tab import ScanTab
+        tab = ScanTab()
+        qtbot.addWidget(tab)
+        assert tab.btn_stop is not None
+        # Initially hidden
+        assert tab.btn_stop.isHidden()
+
+    def test_stop_scan_sets_cancel_event(self, qtbot):
+        from insider_scanner.gui.scan_tab import ScanTab
+        tab = ScanTab()
+        qtbot.addWidget(tab)
+        assert not tab._cancel_event.is_set()
+        tab._stop_scan()
+        assert tab._cancel_event.is_set()
 
 
 class TestMainWindow:

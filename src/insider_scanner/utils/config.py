@@ -41,12 +41,12 @@ DEFAULT_CACHE_TTL: int = 3600  # 1 hour
 def ensure_dirs() -> None:
     """Create all required runtime directories."""
     for d in (
-            CACHE_DIR,
-            EDGAR_CACHE_DIR,
-            SCRAPER_CACHE_DIR,
-            OUTPUTS_DIR,
-            SCAN_OUTPUTS_DIR,
-            DATA_DIR,
+        CACHE_DIR,
+        EDGAR_CACHE_DIR,
+        SCRAPER_CACHE_DIR,
+        OUTPUTS_DIR,
+        SCAN_OUTPUTS_DIR,
+        DATA_DIR,
     ):
         d.mkdir(parents=True, exist_ok=True)
 

@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from datetime import date
+from unittest.mock import patch
 
 import responses
 
 from insider_scanner.core.secform4 import parse_secform4_html, scrape_ticker
 from tests.fixtures import SECFORM4_HTML
+
+# AAPL CIK (raw, not zero-padded)
+AAPL_CIK = "320193"
 
 
 class TestParseSecform4:
@@ -38,7 +42,6 @@ class TestParseSecform4:
         assert ceo[0].value == 18_550_000
 
     def test_trade_dates_parsed(self):
-        from datetime import date
         trades = parse_secform4_html(SECFORM4_HTML, "AAPL")
         ceo = [t for t in trades if "Cook" in t.insider_name][0]
         assert ceo.trade_date == date(2025, 11, 15)
@@ -50,76 +53,105 @@ class TestParseSecform4:
 
 
 class TestScrapeSecform4:
+    """Tests for scrape_ticker with CIK resolution mocked."""
+
     @responses.activate
-    def test_scrape_ticker_mocked(self):
+    @patch("insider_scanner.core.edgar.resolve_cik_from_json", return_value=AAPL_CIK)
+    def test_scrape_ticker_mocked(self, mock_cik):
         responses.add(
             responses.GET,
-            "https://www.secform4.com/AAPL.htm",
+            f"https://www.secform4.com/{AAPL_CIK}.htm",
             body=SECFORM4_HTML,
             status=200,
         )
         trades = scrape_ticker("AAPL", use_cache=False)
         assert len(trades) == 4
         assert all(t.ticker == "AAPL" for t in trades)
+        mock_cik.assert_called_once_with("AAPL", use_cache=False)
 
     @responses.activate
-    def test_scrape_404(self):
+    @patch("insider_scanner.core.edgar.resolve_cik_from_json", return_value=AAPL_CIK)
+    def test_scrape_404(self, mock_cik):
         responses.add(
             responses.GET,
-            "https://www.secform4.com/ZZZZ.htm",
+            f"https://www.secform4.com/{AAPL_CIK}.htm",
             status=404,
         )
+        trades = scrape_ticker("AAPL", use_cache=False)
+        assert trades == []
+
+    @patch("insider_scanner.core.edgar.resolve_cik_from_json", return_value=None)
+    def test_scrape_cik_not_found(self, mock_cik):
+        """If CIK cannot be resolved, return empty list."""
         trades = scrape_ticker("ZZZZ", use_cache=False)
         assert trades == []
 
     @responses.activate
-    def test_scrape_network_error(self):
+    @patch("insider_scanner.core.edgar.resolve_cik_from_json", return_value=AAPL_CIK)
+    def test_scrape_network_error(self, mock_cik):
         responses.add(
             responses.GET,
-            "https://www.secform4.com/FAIL.htm",
+            f"https://www.secform4.com/{AAPL_CIK}.htm",
             body=ConnectionError("network error"),
         )
-        trades = scrape_ticker("FAIL", use_cache=False)
+        trades = scrape_ticker("AAPL", use_cache=False)
         assert trades == []
 
     @responses.activate
-    def test_scrape_with_start_date(self):
+    @patch("insider_scanner.core.edgar.resolve_cik_from_json", return_value=AAPL_CIK)
+    def test_scrape_with_start_date(self, mock_cik):
         responses.add(
             responses.GET,
-            "https://www.secform4.com/AAPL.htm",
+            f"https://www.secform4.com/{AAPL_CIK}.htm",
             body=SECFORM4_HTML,
             status=200,
         )
         trades = scrape_ticker("AAPL", use_cache=False, start_date=date(2025, 11, 1))
-        # Only Nov trades should pass (Cook 11/15, Williams 11/10)
-        assert all(t.trade_date >= date(2025, 11, 1) for t in trades)
+        # Only filing dates >= Nov 1: Cook (11/17), Williams (11/12)
+        assert all(t.filing_date >= date(2025, 11, 1) for t in trades)
         assert len(trades) == 2
 
     @responses.activate
-    def test_scrape_with_end_date(self):
+    @patch("insider_scanner.core.edgar.resolve_cik_from_json", return_value=AAPL_CIK)
+    def test_scrape_with_end_date(self, mock_cik):
         responses.add(
             responses.GET,
-            "https://www.secform4.com/AAPL.htm",
+            f"https://www.secform4.com/{AAPL_CIK}.htm",
             body=SECFORM4_HTML,
             status=200,
         )
-        trades = scrape_ticker("AAPL", use_cache=False, end_date=date(2025, 10, 1))
-        # Only Maestri (10/01) and Pelosi (09/20)
-        assert all(t.trade_date <= date(2025, 10, 1) for t in trades)
+        trades = scrape_ticker("AAPL", use_cache=False, end_date=date(2025, 10, 3))
+        # Only filing dates <= Oct 3: Maestri (10/03), Pelosi (09/22)
+        assert all(t.filing_date <= date(2025, 10, 3) for t in trades)
         assert len(trades) == 2
 
     @responses.activate
-    def test_scrape_with_date_range(self):
+    @patch("insider_scanner.core.edgar.resolve_cik_from_json", return_value=AAPL_CIK)
+    def test_scrape_with_date_range(self, mock_cik):
         responses.add(
             responses.GET,
-            "https://www.secform4.com/AAPL.htm",
+            f"https://www.secform4.com/{AAPL_CIK}.htm",
             body=SECFORM4_HTML,
             status=200,
         )
         trades = scrape_ticker(
             "AAPL", use_cache=False,
-            start_date=date(2025, 10, 1),
-            end_date=date(2025, 11, 10),
+            start_date=date(2025, 10, 3),
+            end_date=date(2025, 11, 12),
         )
-        # Maestri 10/01, Williams 11/10
+        # Filing dates in range: Maestri (10/03), Williams (11/12)
         assert len(trades) == 2
+
+    @responses.activate
+    @patch("insider_scanner.core.edgar.resolve_cik_from_json", return_value=AAPL_CIK)
+    def test_url_uses_cik_not_ticker(self, mock_cik):
+        """Verify the HTTP request goes to CIK-based URL, not ticker-based."""
+        responses.add(
+            responses.GET,
+            f"https://www.secform4.com/{AAPL_CIK}.htm",
+            body=SECFORM4_HTML,
+            status=200,
+        )
+        scrape_ticker("AAPL", use_cache=False)
+        assert len(responses.calls) == 1
+        assert f"/{AAPL_CIK}.htm" in responses.calls[0].request.url

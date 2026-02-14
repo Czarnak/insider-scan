@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date
+import json
+import sys
+from datetime import date, timedelta
 
 from insider_scanner.utils.config import ensure_dirs
 from insider_scanner.utils.logging import setup_logging, get_logger
@@ -108,7 +110,7 @@ def cmd_resolve_cik(args: argparse.Namespace) -> None:
 
 def cmd_init_congress(args: argparse.Namespace) -> None:
     """Initialize the default Congress member list."""
-    from insider_scanner.core.senate import init_default_congress_file
+    from insider_scanner.core.senate import init_default_congress_file, CONGRESS_FILE
     from insider_scanner.utils.config import CONGRESS_FILE
 
     init_default_congress_file()

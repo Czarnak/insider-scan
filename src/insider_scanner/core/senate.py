@@ -55,8 +55,8 @@ def _normalize_name(name: str) -> str:
 
 
 def flag_congress_trades(
-        trades: list[InsiderTrade],
-        members: list[dict] | None = None,
+    trades: list[InsiderTrade],
+    members: list[dict] | None = None,
 ) -> list[InsiderTrade]:
     """Flag trades where the insider name matches a Congress member.
 

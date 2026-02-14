@@ -34,10 +34,11 @@ The GUI provides:
 - **Latest trades**: Fetch recent insider trades across all tickers, with configurable count (10–500)
 - **Watchlist scan**: One-click scan of all tickers in `data/tickers_watchlist.txt` — results merged and deduplicated
 - **Source selection**: Toggle secform4 and/or openinsider sources
-- **Date range**: Optional start/end date pickers with calendar popups — passed to scrapers and applied as filters
+- **Date range**: Optional start/end filing date pickers with calendar popups — passed to scrapers and applied as filters
 - **Filters**: By trade type (Buy/Sell/Exercise), minimum dollar value, Congress-only
-- **Results table**: Sortable columns, Congress trades highlighted in red
+- **Results table**: Sortable columns with both filing date and trade date, Congress trades highlighted in red, auto-generated EDGAR filing links
 - **EDGAR links**: Double-click a trade → view details, click "Open EDGAR Filing" to verify on SEC.gov
+- **Stop scan**: Cancel a running watchlist scan mid-progress
 - **CIK resolver**: Resolve any ticker to its SEC CIK number and open the filings page
 - **Export**: Save scan results as CSV + JSON
 
@@ -73,9 +74,9 @@ insider-scanner-cli scan AAPL --congress-only
 src/insider_scanner/
 ├── core/
 │   ├── models.py        # InsiderTrade dataclass (unified record)
-│   ├── secform4.py      # secform4.com HTML parser + scraper
+│   ├── secform4.py      # secform4.com scraper (CIK-based URLs via EDGAR resolver)
 │   ├── openinsider.py   # openinsider.com HTML parser + scraper
-│   ├── edgar.py         # SEC EDGAR CIK resolver + filing URLs
+│   ├── edgar.py         # SEC EDGAR CIK resolver (JSON primary + HTML fallback) + filing URLs
 │   ├── senate.py        # Congress member list + trade flagging
 │   └── merger.py        # Multi-source dedup, filtering, export
 ├── gui/
@@ -97,12 +98,13 @@ scripts/
 
 ### Data Flow
 
-1. **Scrape**: `secform4.py` and `openinsider.py` parse HTML tables into `InsiderTrade` records
-2. **Cache**: HTTP responses are cached locally with configurable TTL (default 1h)
-3. **Merge**: `merger.py` deduplicates trades across sources (matching by ticker + name + date + share count)
-4. **Flag**: `senate.py` checks insider names against the Congress member list (fuzzy matching)
-5. **Verify**: `edgar.py` generates SEC EDGAR filing URLs for any trade (opens in browser)
-6. **Export**: Results saved as CSV + JSON to `outputs/scans/`
+1. **Resolve**: `edgar.py` resolves ticker → CIK via SEC `company_tickers.json` (cached 24h, HTML fallback)
+2. **Scrape**: `secform4.py` fetches CIK-based pages; `openinsider.py` fetches ticker-based pages; both parse HTML into `InsiderTrade` records
+3. **Cache**: HTTP responses are cached locally with configurable TTL (default 1h)
+4. **Merge**: `merger.py` deduplicates trades across sources (matching by ticker + name + date + share count)
+5. **Flag**: `senate.py` checks insider names against the Congress member list (fuzzy matching)
+6. **Verify**: `edgar.py` generates SEC EDGAR filing URLs for any trade (opens in browser)
+7. **Export**: Results saved as CSV + JSON to `outputs/scans/`
 
 ### SEC EDGAR Compliance
 

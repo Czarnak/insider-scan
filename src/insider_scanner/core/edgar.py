@@ -7,6 +7,7 @@ as required by https://www.sec.gov/os/accessing-edgar-data.
 from __future__ import annotations
 
 import json
+from datetime import date
 
 from insider_scanner.core.models import InsiderTrade
 from insider_scanner.utils.config import EDGAR_CACHE_DIR
@@ -21,10 +22,56 @@ EDGAR_FULL_TEXT_SEARCH = "https://efts.sec.gov/LATEST/search-index?q={query}&for
 EDGAR_SUBMISSIONS = "https://data.sec.gov/submissions/CIK{cik}.json"
 EDGAR_FILING_BASE = "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={cik}&type=4&dateb=&owner=include&count=40"
 EDGAR_FILING_URL = "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={cik}&type=4&dateb=&owner=include&count={count}"
+COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+
+
+def resolve_cik_from_json(ticker: str, use_cache: bool = True) -> str | None:
+    """Resolve a ticker to CIK using SEC's company_tickers.json.
+
+    This is the preferred method — fast, reliable, and doesn't require
+    HTML parsing. The JSON file maps every publicly traded company to its
+    CIK and ticker symbol.
+
+    Parameters
+    ----------
+    ticker : str
+        Stock ticker (e.g. "AAPL").
+    use_cache : bool
+        Whether to use the file cache.
+
+    Returns
+    -------
+    str or None
+        Raw CIK string (not zero-padded) or None if not found.
+    """
+    cache_dir = EDGAR_CACHE_DIR if use_cache else None
+
+    try:
+        text = fetch_url(
+            COMPANY_TICKERS_URL,
+            cache_dir=cache_dir,
+            cache_ttl=86400,  # 24h — this file changes rarely
+            use_sec_agent=True,
+        )
+        data = json.loads(text)
+    except Exception as exc:
+        log.warning("company_tickers.json fetch failed: %s", exc)
+        return None
+
+    ticker_upper = ticker.upper()
+    for entry in data.values():
+        if entry.get("ticker", "").upper() == ticker_upper:
+            cik = entry.get("cik_str", "")
+            if cik:
+                return str(cik)
+    return None
 
 
 def resolve_cik(ticker: str, use_cache: bool = True) -> str | None:
     """Resolve a ticker symbol to a SEC CIK number.
+
+    Uses the SEC company_tickers.json as the primary source (fast, reliable),
+    falling back to HTML scraping of the EDGAR browse page if needed.
 
     Parameters
     ----------
@@ -38,13 +85,28 @@ def resolve_cik(ticker: str, use_cache: bool = True) -> str | None:
     str or None
         CIK number (zero-padded to 10 digits) or None if not found.
     """
-    url = f"https://www.sec.gov/cgi-bin/browse-edgar?company=&CIK={ticker.upper()}&type=4&dateb=&owner=include&count=1&search_text=&action=getcompany"
+    # Primary: JSON lookup
+    raw_cik = resolve_cik_from_json(ticker, use_cache=use_cache)
+    if raw_cik:
+        return raw_cik.zfill(10)
+
+    # Fallback: HTML scraping
+    log.info("JSON lookup missed for %s, trying HTML fallback", ticker)
+    return _resolve_cik_html(ticker, use_cache=use_cache)
+
+
+def _resolve_cik_html(ticker: str, use_cache: bool = True) -> str | None:
+    """Resolve CIK by scraping the EDGAR company browse page (fallback)."""
+    url = (
+        f"https://www.sec.gov/cgi-bin/browse-edgar?company=&CIK={ticker.upper()}"
+        f"&type=4&dateb=&owner=include&count=1&search_text=&action=getcompany"
+    )
     cache_dir = EDGAR_CACHE_DIR if use_cache else None
 
     try:
         html = fetch_url(url, cache_dir=cache_dir, cache_ttl=86400, use_sec_agent=True)
     except Exception as exc:
-        log.warning("CIK lookup failed for %s: %s", ticker, exc)
+        log.warning("CIK HTML lookup failed for %s: %s", ticker, exc)
         return None
 
     return parse_cik_from_html(html)

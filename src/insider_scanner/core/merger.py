@@ -56,7 +56,7 @@ def _richness_score(trade: InsiderTrade) -> int:
 
 
 def merge_trades(
-        *trade_lists: list[InsiderTrade],
+    *trade_lists: list[InsiderTrade],
 ) -> list[InsiderTrade]:
     """Merge and deduplicate trades from multiple sources.
 
@@ -112,14 +112,14 @@ def merge_trades(
 
 
 def filter_trades(
-        trades: list[InsiderTrade],
-        *,
-        ticker: str | None = None,
-        trade_type: str | None = None,
-        min_value: float | None = None,
-        congress_only: bool = False,
-        since: date | None = None,
-        until: date | None = None,
+    trades: list[InsiderTrade],
+    *,
+    ticker: str | None = None,
+    trade_type: str | None = None,
+    min_value: float | None = None,
+    congress_only: bool = False,
+    since: date | None = None,
+    until: date | None = None,
 ) -> list[InsiderTrade]:
     """Filter trades by various criteria.
 
@@ -136,9 +136,9 @@ def filter_trades(
     congress_only : bool
         If True, only return congress-flagged trades.
     since : date or None
-        Only return trades on or after this date.
+        Only return trades with filing_date on or after this date.
     until : date or None
-        Only return trades on or before this date.
+        Only return trades with filing_date on or before this date.
 
     Returns
     -------
@@ -155,9 +155,9 @@ def filter_trades(
     if congress_only:
         result = [t for t in result if t.is_congress]
     if since:
-        result = [t for t in result if t.trade_date and t.trade_date >= since]
+        result = [t for t in result if t.filing_date and t.filing_date >= since]
     if until:
-        result = [t for t in result if t.trade_date and t.trade_date <= until]
+        result = [t for t in result if t.filing_date and t.filing_date <= until]
 
     return result
 
@@ -170,9 +170,9 @@ def trades_to_dataframe(trades: list[InsiderTrade]) -> pd.DataFrame:
 
 
 def save_scan_results(
-        trades: list[InsiderTrade],
-        label: str = "scan",
-        output_dir: Path | None = None,
+    trades: list[InsiderTrade],
+    label: str = "scan",
+    output_dir: Path | None = None,
 ) -> Path:
     """Save scan results as CSV and JSON.
 

@@ -13,7 +13,7 @@ from insider_scanner.utils.logging import get_logger
 
 log = get_logger("secform4")
 
-BASE_URL = "https://www.secform4.com"
+BASE_URL = "https://www.secform4.com/insider-trading"
 
 
 def _parse_date(text: str) -> date | None:
@@ -68,12 +68,15 @@ def _classify_trade(text: str) -> str:
 
 
 def scrape_ticker(
-        ticker: str,
-        use_cache: bool = True,
-        start_date: date | None = None,
-        end_date: date | None = None,
+    ticker: str,
+    use_cache: bool = True,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ) -> list[InsiderTrade]:
     """Scrape insider trades for a specific ticker from secform4.com.
+
+    Resolves the ticker to a CIK number via SEC's company_tickers.json,
+    then fetches the secform4.com page at BASE_URL/{cik}.htm.
 
     Parameters
     ----------
@@ -82,15 +85,23 @@ def scrape_ticker(
     use_cache : bool
         Whether to use the file cache.
     start_date : date or None
-        Only include trades on or after this date.
+        Only include trades with filing_date on or after this date.
     end_date : date or None
-        Only include trades on or before this date.
+        Only include trades with filing_date on or before this date.
 
     Returns
     -------
     list of InsiderTrade
     """
-    url = f"{BASE_URL}/{ticker.upper()}.htm"
+    from insider_scanner.core.edgar import resolve_cik_from_json
+
+    # Resolve ticker → CIK (raw, not zero-padded)
+    raw_cik = resolve_cik_from_json(ticker, use_cache=use_cache)
+    if not raw_cik:
+        log.warning("Could not resolve CIK for %s — skipping secform4", ticker)
+        return []
+
+    url = f"{BASE_URL}/{raw_cik}.htm"
     cache_dir = SCRAPER_CACHE_DIR if use_cache else None
 
     try:
@@ -101,11 +112,11 @@ def scrape_ticker(
 
     trades = parse_secform4_html(html, ticker)
 
-    # Post-filter by date (secform4 doesn't support date params in URL)
+    # Post-filter by filing date (secform4 doesn't support date params in URL)
     if start_date:
-        trades = [t for t in trades if t.trade_date and t.trade_date >= start_date]
+        trades = [t for t in trades if t.filing_date and t.filing_date >= start_date]
     if end_date:
-        trades = [t for t in trades if t.trade_date and t.trade_date <= end_date]
+        trades = [t for t in trades if t.filing_date and t.filing_date <= end_date]
 
     return trades
 
