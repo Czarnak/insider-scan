@@ -13,6 +13,12 @@ from tests.fixtures import SECFORM4_HTML
 # AAPL CIK (raw, not zero-padded)
 AAPL_CIK = "320193"
 
+# Fixture rows (filing dates):
+#   KONDO CHRIS        – Sale,     trade 2025-11-07, filing 2025-11-12
+#   Parekh Kevan       – Sale,     trade 2025-10-16, filing 2025-10-17
+#   COOK TIMOTHY D     – Sale,     trade 2025-10-02, filing 2025-10-03
+#   Pelosi Nancy       – Purchase, trade 2025-09-15, filing 2025-09-17
+
 
 class TestParseSecform4:
     def test_parse_trades(self):
@@ -20,6 +26,7 @@ class TestParseSecform4:
         assert len(trades) == 4
 
     def test_ticker_assigned(self):
+        """Ticker should come from the Symbol column, not the argument."""
         trades = parse_secform4_html(SECFORM4_HTML, "AAPL")
         assert all(t.ticker == "AAPL" for t in trades)
 
@@ -35,17 +42,40 @@ class TestParseSecform4:
 
     def test_ceo_trade(self):
         trades = parse_secform4_html(SECFORM4_HTML, "AAPL")
-        ceo = [t for t in trades if "Cook" in t.insider_name]
+        ceo = [t for t in trades if "COOK" in t.insider_name]
         assert len(ceo) == 1
-        assert ceo[0].shares == 100_000
-        assert ceo[0].price == 185.50
-        assert ceo[0].value == 18_550_000
+        assert ceo[0].shares == 129_963
+        assert ceo[0].price == 256.81
+        assert ceo[0].value == 33_375_723
 
     def test_trade_dates_parsed(self):
         trades = parse_secform4_html(SECFORM4_HTML, "AAPL")
-        ceo = [t for t in trades if "Cook" in t.insider_name][0]
-        assert ceo.trade_date == date(2025, 11, 15)
-        assert ceo.filing_date == date(2025, 11, 17)
+        ceo = [t for t in trades if "COOK" in t.insider_name][0]
+        assert ceo.trade_date == date(2025, 10, 2)
+        assert ceo.filing_date == date(2025, 10, 3)
+
+    def test_insider_title_parsed(self):
+        """Insider title comes from <span class="pos">."""
+        trades = parse_secform4_html(SECFORM4_HTML, "AAPL")
+        ceo = [t for t in trades if "COOK" in t.insider_name][0]
+        assert ceo.insider_title == "Chief Executive Officer"
+
+    def test_company_parsed(self):
+        trades = parse_secform4_html(SECFORM4_HTML, "AAPL")
+        assert all(t.company == "Apple Inc." for t in trades)
+
+    def test_edgar_url_extracted(self):
+        """Each row should have a secform4.com filing link."""
+        trades = parse_secform4_html(SECFORM4_HTML, "AAPL")
+        assert all(t.edgar_url.startswith("https://www.secform4.com/filings/") for t in trades)
+        ceo = [t for t in trades if "COOK" in t.insider_name][0]
+        assert "0001214156-25-000011" in ceo.edgar_url
+
+    def test_shares_owned_ignores_ownership_span(self):
+        """Shares Owned should be the number, not '15,098(Direct)'."""
+        trades = parse_secform4_html(SECFORM4_HTML, "AAPL")
+        kondo = [t for t in trades if "KONDO" in t.insider_name][0]
+        assert kondo.shares_owned_after == 15_098
 
     def test_empty_html(self):
         trades = parse_secform4_html("<html><body></body></html>", "TEST")
@@ -60,7 +90,7 @@ class TestScrapeSecform4:
     def test_scrape_ticker_mocked(self, mock_cik):
         responses.add(
             responses.GET,
-            f"https://www.secform4.com/{AAPL_CIK}.htm",
+            f"https://www.secform4.com/insider-trading/{AAPL_CIK}.htm",
             body=SECFORM4_HTML,
             status=200,
         )
@@ -74,7 +104,7 @@ class TestScrapeSecform4:
     def test_scrape_404(self, mock_cik):
         responses.add(
             responses.GET,
-            f"https://www.secform4.com/{AAPL_CIK}.htm",
+            f"https://www.secform4.com/insider-trading/{AAPL_CIK}.htm",
             status=404,
         )
         trades = scrape_ticker("AAPL", use_cache=False)
@@ -91,7 +121,7 @@ class TestScrapeSecform4:
     def test_scrape_network_error(self, mock_cik):
         responses.add(
             responses.GET,
-            f"https://www.secform4.com/{AAPL_CIK}.htm",
+            f"https://www.secform4.com/insider-trading/{AAPL_CIK}.htm",
             body=ConnectionError("network error"),
         )
         trades = scrape_ticker("AAPL", use_cache=False)
@@ -102,13 +132,13 @@ class TestScrapeSecform4:
     def test_scrape_with_start_date(self, mock_cik):
         responses.add(
             responses.GET,
-            f"https://www.secform4.com/{AAPL_CIK}.htm",
+            f"https://www.secform4.com/insider-trading/{AAPL_CIK}.htm",
             body=SECFORM4_HTML,
             status=200,
         )
-        trades = scrape_ticker("AAPL", use_cache=False, start_date=date(2025, 11, 1))
-        # Only filing dates >= Nov 1: Cook (11/17), Williams (11/12)
-        assert all(t.filing_date >= date(2025, 11, 1) for t in trades)
+        trades = scrape_ticker("AAPL", use_cache=False, start_date=date(2025, 10, 17))
+        # Only filing dates >= Oct 17: Kondo (11/12), Parekh (10/17)
+        assert all(t.filing_date >= date(2025, 10, 17) for t in trades)
         assert len(trades) == 2
 
     @responses.activate
@@ -116,12 +146,12 @@ class TestScrapeSecform4:
     def test_scrape_with_end_date(self, mock_cik):
         responses.add(
             responses.GET,
-            f"https://www.secform4.com/{AAPL_CIK}.htm",
+            f"https://www.secform4.com/insider-trading/{AAPL_CIK}.htm",
             body=SECFORM4_HTML,
             status=200,
         )
         trades = scrape_ticker("AAPL", use_cache=False, end_date=date(2025, 10, 3))
-        # Only filing dates <= Oct 3: Maestri (10/03), Pelosi (09/22)
+        # Only filing dates <= Oct 3: Cook (10/03), Pelosi (09/17)
         assert all(t.filing_date <= date(2025, 10, 3) for t in trades)
         assert len(trades) == 2
 
@@ -130,16 +160,16 @@ class TestScrapeSecform4:
     def test_scrape_with_date_range(self, mock_cik):
         responses.add(
             responses.GET,
-            f"https://www.secform4.com/{AAPL_CIK}.htm",
+            f"https://www.secform4.com/insider-trading/{AAPL_CIK}.htm",
             body=SECFORM4_HTML,
             status=200,
         )
         trades = scrape_ticker(
             "AAPL", use_cache=False,
             start_date=date(2025, 10, 3),
-            end_date=date(2025, 11, 12),
+            end_date=date(2025, 10, 17),
         )
-        # Filing dates in range: Maestri (10/03), Williams (11/12)
+        # Filing dates in range Oct 3–Oct 17: Cook (10/03), Parekh (10/17)
         assert len(trades) == 2
 
     @responses.activate
@@ -148,7 +178,7 @@ class TestScrapeSecform4:
         """Verify the HTTP request goes to CIK-based URL, not ticker-based."""
         responses.add(
             responses.GET,
-            f"https://www.secform4.com/{AAPL_CIK}.htm",
+            f"https://www.secform4.com/insider-trading/{AAPL_CIK}.htm",
             body=SECFORM4_HTML,
             status=200,
         )
