@@ -161,13 +161,14 @@ class TestMainWindow:
         from insider_scanner.gui.main_window import MainWindow
         win = MainWindow()
         qtbot.addWidget(win)
-        assert win.tabs.count() == 1
+        assert win.tabs.count() == 2
 
     def test_tab_name(self, qtbot):
         from insider_scanner.gui.main_window import MainWindow
         win = MainWindow()
         qtbot.addWidget(win)
         assert win.tabs.tabText(0) == "Insider Scan"
+        assert win.tabs.tabText(1) == "Congress Scan"
 
     def test_status_bar(self, qtbot):
         from insider_scanner.gui.main_window import MainWindow
@@ -175,3 +176,83 @@ class TestMainWindow:
         qtbot.addWidget(win)
         win.log_status("Testing")
         assert win.status_bar.currentMessage() == "Testing"
+
+
+class TestCongressTab:
+    def test_create(self, qtbot):
+        from insider_scanner.gui.congress_tab import CongressTab
+        tab = CongressTab()
+        qtbot.addWidget(tab)
+        assert tab.btn_scan is not None
+        assert tab.btn_stop is not None
+        assert tab.btn_filter is not None
+        assert tab.btn_save is not None
+        assert tab.btn_open_filing is not None
+
+    def test_source_checkboxes(self, qtbot):
+        from insider_scanner.gui.congress_tab import CongressTab
+        tab = CongressTab()
+        qtbot.addWidget(tab)
+        assert tab.chk_house.isChecked()
+        assert tab.chk_senate.isChecked()
+
+    def test_official_combo(self, qtbot):
+        from insider_scanner.gui.congress_tab import CongressTab
+        tab = CongressTab()
+        qtbot.addWidget(tab)
+        assert tab.official_combo.count() >= 1
+        assert tab.official_combo.itemText(0) == "All"
+        assert tab.official_combo.isEditable()
+
+    def test_date_toggle(self, qtbot):
+        from insider_scanner.gui.congress_tab import CongressTab
+        tab = CongressTab()
+        qtbot.addWidget(tab)
+        assert not tab.start_date.isEnabled()
+        tab.chk_use_dates.setChecked(True)
+        assert tab.start_date.isEnabled()
+        assert tab.end_date.isEnabled()
+
+    def test_type_combo(self, qtbot):
+        from insider_scanner.gui.congress_tab import CongressTab
+        tab = CongressTab()
+        qtbot.addWidget(tab)
+        items = [tab.type_combo.itemText(i) for i in range(tab.type_combo.count())]
+        assert "All" in items
+        assert "Purchase" in items
+        assert "Sale" in items
+
+    def test_sector_combo(self, qtbot):
+        from insider_scanner.gui.congress_tab import CongressTab
+        tab = CongressTab()
+        qtbot.addWidget(tab)
+        items = [tab.sector_combo.itemText(i) for i in range(tab.sector_combo.count())]
+        assert "All" in items
+        assert "Defense" in items
+        assert "Finance" in items
+
+    def test_set_scan_buttons_enabled(self, qtbot):
+        from insider_scanner.gui.congress_tab import CongressTab
+        tab = CongressTab()
+        qtbot.addWidget(tab)
+        tab._set_scan_buttons_enabled(False)
+        assert not tab.btn_scan.isEnabled()
+        assert tab.btn_stop.isEnabled()  # stop enabled when scanning
+        tab._set_scan_buttons_enabled(True)
+        assert tab.btn_scan.isEnabled()
+        assert not tab.btn_stop.isEnabled()  # stop disabled when idle
+
+    def test_stop_sets_cancel_event(self, qtbot):
+        from insider_scanner.gui.congress_tab import CongressTab
+        tab = CongressTab()
+        qtbot.addWidget(tab)
+        assert not tab._cancel_event.is_set()
+        tab._stop_scan()
+        assert tab._cancel_event.is_set()
+
+    def test_display_empty_trades(self, qtbot):
+        from insider_scanner.gui.congress_tab import CongressTab
+        tab = CongressTab()
+        qtbot.addWidget(tab)
+        tab._display_trades([])
+        assert "No trades" in tab.status_label.text()

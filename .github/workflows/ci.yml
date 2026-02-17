@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
@@ -27,16 +27,24 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1
+          sudo apt-get install -y libegl1 xvfb
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Run tests (excluding live)
+      - name: Run tests (Linux — with xvfb for GUI)
+        if: runner.os == 'Linux'
         run: |
-          pytest -m "not live" --cov=insider_scanner --cov-report=xml -v
+          xvfb-run --auto-servernum pytest -m "not live" --cov=insider_scanner --cov-report=xml -v
+        env:
+          QT_QPA_PLATFORM: offscreen
+
+      - name: Run tests (Windows — skip GUI widget tests)
+        if: runner.os == 'Windows'
+        run: |
+          pytest -m "not live" --ignore=tests/test_gui.py --cov=insider_scanner --cov-report=xml -v
         env:
           QT_QPA_PLATFORM: offscreen
 

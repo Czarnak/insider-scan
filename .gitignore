@@ -310,3 +310,5 @@ __marimo__/
 *.xlsx
 /translate/api_key.txt
 /stateCongess_apiKey.txt
+/scripts/api_key.txt
+/playground.ipynb

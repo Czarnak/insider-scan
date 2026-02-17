@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from typing import Literal
 
@@ -74,3 +74,118 @@ class InsiderTrade:
             is_congress=d.get("is_congress", False),
             congress_member=d.get("congress_member", ""),
         )
+
+
+@dataclass
+class CongressTrade:
+    """Financial disclosure trade record for a Congress member.
+
+    Unlike InsiderTrade, Congress disclosures report dollar *ranges*
+    (e.g. "$1,001 - $15,000") rather than exact transaction values.
+    """
+
+    # Official identity
+    official_name: str = ""
+    chamber: Literal["House", "Senate", ""] = ""
+    party: str = ""
+
+    # Filing metadata
+    filing_date: date | None = None
+    doc_id: str = ""
+    source_url: str = ""
+
+    # Trade details
+    trade_date: date | None = None
+    asset_description: str = ""
+    ticker: str = ""  # Parsed from asset_description when available
+    trade_type: Literal["Purchase", "Sale", "Exchange", "Other"] = "Other"
+    owner: str = ""  # Self, Spouse, Dependent Child, Joint
+
+    # Amount (reported as a range)
+    amount_range: str = ""  # Original string, e.g. "$1,001 - $15,000"
+    amount_low: float = 0.0  # Lower bound parsed from range
+    amount_high: float = 0.0  # Upper bound parsed from range
+
+    # Context
+    comment: str = ""
+    source: str = ""  # "house", "senate"
+
+    def to_dict(self) -> dict:
+        return {
+            "official_name": self.official_name,
+            "chamber": self.chamber,
+            "party": self.party,
+            "filing_date": str(self.filing_date) if self.filing_date else "",
+            "doc_id": self.doc_id,
+            "source_url": self.source_url,
+            "trade_date": str(self.trade_date) if self.trade_date else "",
+            "asset_description": self.asset_description,
+            "ticker": self.ticker,
+            "trade_type": self.trade_type,
+            "owner": self.owner,
+            "amount_range": self.amount_range,
+            "amount_low": self.amount_low,
+            "amount_high": self.amount_high,
+            "comment": self.comment,
+            "source": self.source,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "CongressTrade":
+        td = d.get("trade_date", "")
+        fd = d.get("filing_date", "")
+        return cls(
+            official_name=d.get("official_name", ""),
+            chamber=d.get("chamber", ""),
+            party=d.get("party", ""),
+            filing_date=date.fromisoformat(fd) if fd else None,
+            doc_id=d.get("doc_id", ""),
+            source_url=d.get("source_url", ""),
+            trade_date=date.fromisoformat(td) if td else None,
+            asset_description=d.get("asset_description", ""),
+            ticker=d.get("ticker", ""),
+            trade_type=d.get("trade_type", "Other"),
+            owner=d.get("owner", ""),
+            amount_range=d.get("amount_range", ""),
+            amount_low=float(d.get("amount_low", 0)),
+            amount_high=float(d.get("amount_high", 0)),
+            comment=d.get("comment", ""),
+            source=d.get("source", ""),
+        )
+
+    @staticmethod
+    def parse_amount_range(text: str) -> tuple[float, float]:
+        """Parse a dollar range string into (low, high) floats.
+
+        Examples:
+            "$1,001 - $15,000"  → (1001.0, 15000.0)
+            "$50,001 - $100,000" → (50001.0, 100000.0)
+            "$1,000,001 - $5,000,000" → (1000001.0, 5000000.0)
+            "Over $50,000,000" → (50000000.0, 50000000.0)
+            "" → (0.0, 0.0)
+        """
+        if not text or not text.strip():
+            return 0.0, 0.0
+
+        text = text.strip()
+
+        # Handle "Over $X" pattern
+        if text.lower().startswith("over"):
+            num_str = text.split("$", 1)[-1].replace(",", "").strip()
+            try:
+                val = float(num_str)
+                return val, val
+            except ValueError:
+                return 0.0, 0.0
+
+        # Standard range: "$X - $Y"
+        parts = text.split("-")
+        if len(parts) != 2:
+            return 0.0, 0.0
+
+        try:
+            low = float(parts[0].replace("$", "").replace(",", "").strip())
+            high = float(parts[1].replace("$", "").replace(",", "").strip())
+            return low, high
+        except ValueError:
+            return 0.0, 0.0

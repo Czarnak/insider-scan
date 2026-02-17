@@ -29,13 +29,13 @@ def _rate_limit() -> None:
 
 
 def fetch_url(
-    url: str,
-    *,
-    cache_dir: Path | None = None,
-    cache_ttl: int = 3600,
-    headers: dict | None = None,
-    timeout: int = 15,
-    use_sec_agent: bool = False,
+        url: str,
+        *,
+        cache_dir: Path | None = None,
+        cache_ttl: int = 3600,
+        headers: dict | None = None,
+        timeout: int = 15,
+        use_sec_agent: bool = False,
 ) -> str:
     """Fetch a URL with optional caching and rate limiting.
 

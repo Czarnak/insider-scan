@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Optional, Tuple
 
 import pandas as pd
+from PySide6 import QtWidgets
 from PySide6.QtCore import (
     Qt,
     QAbstractTableModel,
@@ -76,3 +77,130 @@ class SortableTableModel(QSortFilterProxyModel):
     @property
     def dataframe(self):
         return self._source.dataframe
+
+
+class PriceChangeCard(QtWidgets.QFrame):
+    def __init__(self, title: str, parent=None):
+        super().__init__(parent)
+        self.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
+        self.setObjectName("PriceChangeCard")
+        self.setStyleSheet("""
+            QFrame#PriceChangeCard {
+                border: 1px solid rgba(255,255,255,40);
+                border-radius: 10px;
+                padding: 10px;
+            }
+        """)
+
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setSpacing(6)
+
+        self.title_lbl = QtWidgets.QLabel(title)
+        self.title_lbl.setStyleSheet("font-weight: 600;")
+
+        self.price_lbl = QtWidgets.QLabel("—")
+        self.price_lbl.setStyleSheet("font-size: 22px; font-weight: 700;")
+
+        self.chg_lbl = QtWidgets.QLabel("")
+        self.chg_lbl.setStyleSheet("opacity: 0.9; font-weight: 600;")
+
+        lay.addWidget(self.title_lbl)
+        lay.addWidget(self.price_lbl)
+        lay.addWidget(self.chg_lbl)
+        lay.addStretch(1)
+
+    def set_value(
+            self,
+            price_usd: Optional[float],
+            pct_change: Optional[float],
+            bg_rgba: Tuple[int, int, int, int] = (40, 40, 40, 120),
+    ):
+        if price_usd is None:
+            self.price_lbl.setText("n/a")
+        else:
+            self.price_lbl.setText(f"{price_usd:,.2f} USD")
+
+        if pct_change is None:
+            self.chg_lbl.setText("Δ1D: n/a")
+        else:
+            sign = "+" if pct_change >= 0 else ""
+            self.chg_lbl.setText(f"Δ1D: {sign}{pct_change:.2f}%")
+
+        r, g, b, a = bg_rgba
+        # overwrite bg only (keep borders)
+        self.setStyleSheet("""
+            QFrame#PriceChangeCard {
+                border: 1px solid rgba(255,255,255,40);
+                border-radius: 10px;
+                padding: 10px;
+                background-color: rgba(%d,%d,%d,%d);
+            }
+        """ % (r, g, b, a))
+
+
+class ValueCard(QtWidgets.QFrame):
+    def __init__(self, title: str, parent=None):
+        super().__init__(parent)
+        self.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
+        self.setObjectName("ValueCard")
+        self.setStyleSheet("""
+            QFrame#ValueCard {
+                border: 1px solid rgba(255,255,255,40);
+                border-radius: 10px;
+                padding: 10px;
+            }
+        """)
+
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setSpacing(6)
+
+        self.title_lbl = QtWidgets.QLabel(title)
+        self.title_lbl.setStyleSheet("font-weight: 600;")
+        self.value_lbl = QtWidgets.QLabel("—")
+        self.value_lbl.setStyleSheet("font-size: 22px; font-weight: 700;")
+        self.meta_lbl = QtWidgets.QLabel("")
+        self.meta_lbl.setStyleSheet("opacity: 0.8;")
+
+        lay.addWidget(self.title_lbl)
+        lay.addWidget(self.value_lbl)
+        lay.addWidget(self.meta_lbl)
+        lay.addStretch(1)
+
+    def set_value(self, value_text: str, meta_text: str = "", bg_rgba: Tuple[int, int, int, int] = (40, 40, 40, 120)):
+        self.value_lbl.setText(value_text)
+        self.meta_lbl.setText(meta_text)
+        r, g, b, a = bg_rgba
+        self.setStyleSheet("""
+            QFrame#ValueCard {
+                border: 1px solid rgba(255,255,255,40);
+                border-radius: 10px;
+                padding: 10px;
+                background-color: rgba(%d,%d,%d,%d);
+            }
+        """ % (r, g, b, a))
+
+
+def fg_color(value: int) -> Tuple[int, int, int, int]:
+    if value < 25:
+        return (180, 40, 40, 160)
+    if value < 50:
+        return (200, 120, 40, 160)
+    if value < 75:
+        return (200, 180, 40, 160)
+    return (60, 160, 80, 160)
+
+
+def indicator_color(value: float, bands: Tuple[Tuple[float, float, str], ...]) -> Tuple[int, int, int, int]:
+    palette = {
+        "red": (180, 40, 40, 160),
+        "orange": (200, 120, 40, 160),
+        "yellow": (200, 180, 40, 160),
+        "green": (60, 160, 80, 160),
+        "gray": (80, 80, 80, 120),
+    }
+    for lo, hi, name in bands:
+        if lo <= value < hi:
+            return palette.get(name, palette["gray"])
+    return palette["gray"]

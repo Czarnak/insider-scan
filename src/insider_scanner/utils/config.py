@@ -26,6 +26,7 @@ SCAN_OUTPUTS_DIR: Path = OUTPUTS_DIR / "scans"
 
 CONGRESS_FILE: Path = DATA_DIR / "congress_members.json"
 TICKERS_FILE: Path = DATA_DIR / "tickers_watchlist.txt"
+HOUSE_DISCLOSURES_DIR: Path = DATA_DIR / "house_disclosures"
 
 # SEC EDGAR compliance: https://www.sec.gov/os/accessing-edgar-data
 SEC_USER_AGENT: str = os.getenv(
@@ -41,12 +42,13 @@ DEFAULT_CACHE_TTL: int = 3600  # 1 hour
 def ensure_dirs() -> None:
     """Create all required runtime directories."""
     for d in (
-        CACHE_DIR,
-        EDGAR_CACHE_DIR,
-        SCRAPER_CACHE_DIR,
-        OUTPUTS_DIR,
-        SCAN_OUTPUTS_DIR,
-        DATA_DIR,
+            CACHE_DIR,
+            EDGAR_CACHE_DIR,
+            SCRAPER_CACHE_DIR,
+            OUTPUTS_DIR,
+            SCAN_OUTPUTS_DIR,
+            DATA_DIR,
+            HOUSE_DISCLOSURES_DIR,
     ):
         d.mkdir(parents=True, exist_ok=True)
 
