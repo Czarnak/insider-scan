@@ -31,7 +31,7 @@ from insider_scanner.utils.logging import get_logger
 log = get_logger("congress_house")
 
 BASE_URL = "https://disclosures-clerk.house.gov"
-INDEX_ZIP_URL = BASE_URL + "/public_disc/financial-pdfs/{year}/{year}FD.zip"
+INDEX_ZIP_URL = BASE_URL + "/public_disc/financial-pdfs/{year}FD.zip"
 PTR_PDF_URL = BASE_URL + "/public_disc/ptr-pdfs/{year}/{doc_id}.pdf"
 
 # Filing types in the House index

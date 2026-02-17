@@ -1,72 +1,114 @@
-"""Dashboard tab: main market and crypto indicators."""
+"""Dashboard tab: market prices, VIX chart, Fear & Greed, indicators.
+
+All data is fetched by a SINGLE background Worker calling
+``provider.fetch_all()``.  This avoids yfinance thread-safety issues
+(concurrent yf.download calls corrupt each other's data).
+"""
 
 from __future__ import annotations
 
-from typing import Dict, List, Callable, Any
+import logging
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from PySide6.QtCore import QThreadPool, Slot, QTimer
 from PySide6.QtWidgets import (
+    QGridLayout,
     QHBoxLayout,
     QVBoxLayout,
     QWidget,
-    QGridLayout,
 )
 
-from insider_scanner.core.dashboard import MarketDataProvider, IndicatorSpec
-from insider_scanner.gui.widgets import ValueCard, indicator_color, fg_color, PriceChangeCard
+from insider_scanner.core.dashboard import (
+    PRICE_SYMBOLS,
+    DashboardSnapshot,
+    IndicatorSpec,
+    MarketDataProvider,
+)
+from insider_scanner.gui.widgets import (
+    PriceChangeCard,
+    ValueCard,
+    fg_color,
+    indicator_color,
+)
 from insider_scanner.utils.threading import Worker
+
+log = logging.getLogger(__name__)
 
 
 class DashboardTab(QWidget):
-    def __init__(self, provider: MarketDataProvider, indicator_specs: List[IndicatorSpec], parent=None):
+    """Live-updating dashboard with prices, VIX chart, F&G, and indicators."""
+
+    def __init__(
+        self,
+        provider: MarketDataProvider,
+        indicator_specs: List[IndicatorSpec],
+        parent=None,
+    ):
         super().__init__(parent)
         self.provider = provider
         self.indicator_specs = indicator_specs
 
-        self.pool = QThreadPool.globalInstance()
+        # Single-worker guard
+        self._refreshing: bool = False
+        self._refresh_queued: bool = False
 
+        self._build_ui()
+
+    # ------------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------------
+
+    def _build_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(10, 10, 10, 10)
         root.setSpacing(10)
 
-        # 1) Top row: price + Δ1D%
+        # 1) Top row: price cards
         top = QHBoxLayout()
         top.setSpacing(10)
 
         self.top_cards: Dict[str, PriceChangeCard] = {
-            "GC=F": PriceChangeCard("Gold"),
-            "SI=F": PriceChangeCard("Silver"),
-            "CL=F": PriceChangeCard("Crude Oil"),
-            "ES=F": PriceChangeCard("S&P 500"),
-            "NQ=F": PriceChangeCard("Nasdaq"),
+            sym: PriceChangeCard(label)
+            for sym, label in zip(
+                PRICE_SYMBOLS,
+                ["Gold", "Silver", "Crude Oil", "S&P 500", "Nasdaq"],
+            )
         }
         for card in self.top_cards.values():
             top.addWidget(card, 1)
         root.addLayout(top)
 
-        # 2) VIX plot
+        # 2) VIX chart
         axis = pg.DateAxisItem(orientation="bottom")
-        self.vix_plot = pg.PlotWidget()
         self.vix_plot = pg.PlotWidget(axisItems={"bottom": axis})
-        self.vix_plot.setBackground(None)
+        self.vix_plot.setBackground("#1e1e1e")
         self.vix_plot.showGrid(x=True, y=True, alpha=0.35)
         self.vix_plot.setMinimumHeight(220)
-        self.vix_plot.setTitle("VIX (last ~30 days)")
-        self.vix_curve = self.vix_plot.plot(pen=pg.mkPen(width=3))
+        self.vix_plot.setTitle(
+            "VIX (last ~30 days)", color="w", size="11pt",
+        )
+
+        for axis_name in ("left", "bottom"):
+            ax = self.vix_plot.getAxis(axis_name)
+            ax.setPen(pg.mkPen(color="w", width=1))
+            ax.setTextPen(pg.mkPen(color="w"))
+
+        self.vix_curve = self.vix_plot.plot(
+            pen=pg.mkPen(color="#00bcd4", width=2),
+        )
         root.addWidget(self.vix_plot)
 
-        # 3) Bottom split
+        # 3) Bottom: Fear & Greed (left) + Indicator tiles (right)
         split = QHBoxLayout()
         split.setSpacing(10)
 
-        # Left: Fear & Greed
+        # Left: Fear & Greed cards
         left_box = QVBoxLayout()
         left_box.setSpacing(10)
-
-        self.fg_cards = {
+        self.fg_cards: Dict[str, ValueCard] = {
             "stocks": ValueCard("Fear & Greed (Stocks)"),
             "gold": ValueCard("Fear & Greed (Gold)"),
             "crypto": ValueCard("Fear & Greed (Crypto)"),
@@ -78,11 +120,10 @@ class DashboardTab(QWidget):
         left_widget = QWidget()
         left_widget.setLayout(left_box)
 
-        # Right: Indicator tiles
+        # Right: Indicator tiles in a 2-column grid
         right_grid = QGridLayout()
         right_grid.setHorizontalSpacing(10)
         right_grid.setVerticalSpacing(10)
-
         self.ind_cards: Dict[str, ValueCard] = {}
         cols = 2
         for i, spec in enumerate(self.indicator_specs):
@@ -98,84 +139,95 @@ class DashboardTab(QWidget):
         split.addWidget(right_widget, 1)
         root.addLayout(split)
 
-        # Timer refresh
-        self.timer = QTimer(self)
-        self.timer.setInterval(60_000)
-        self.timer.timeout.connect(self.refresh_async)
-        self.timer.start()
+        # Auto-refresh timer
+        self._timer = QTimer(self)
+        self._timer.setInterval(60_000)
+        self._timer.timeout.connect(self.refresh_async)
+        self._timer.start()
 
-    def _submit(self, key: str, fn: Callable[[], Any]):
-        def work() -> tuple[str, Any]:
-            return key, fn()
-
-        worker = Worker(work)
-        worker.signals.result.connect(self._on_result)
-        worker.signals.error.connect(lambda exc_info, k=key: self._on_failed(k, exc_info))
-        QThreadPool.globalInstance().start(worker)
+    # ------------------------------------------------------------------
+    # Single-worker refresh (no race conditions)
+    # ------------------------------------------------------------------
 
     @Slot()
     def refresh_async(self):
-        # top prices
-        for symbol in self.top_cards.keys():
-            self._submit(f"price:{symbol}", lambda s=symbol: self.provider.get_daily_close(s, 10))
+        """Request a dashboard refresh.
 
-        # VIX
-        self._submit("vix", lambda: self.provider.get_vix_intraday_or_daily(45))
+        If a refresh is already running, the request is queued and
+        executes when the current one finishes.  Only ONE worker runs
+        at a time, which avoids yfinance thread-safety issues.
+        """
+        if self._refreshing:
+            self._refresh_queued = True
+            log.debug("Refresh queued (previous still running)")
+            return
+        self._start_refresh()
 
-        # fear & greed
-        self._submit("fg", lambda: self.provider.get_fear_greed())
+    def _start_refresh(self):
+        """Launch the single background worker."""
+        self._refreshing = True
+        self._refresh_queued = False
 
-        # indicators (read is local, no need threads; but keep consistent)
-        self._submit("indicators", lambda: getattr(self.provider, "latest_indicator_values", {}))
+        worker = Worker(self.provider.fetch_all)
+        worker.signals.result.connect(self._on_snapshot)
+        worker.signals.error.connect(self._on_error)
+        worker.signals.finished.connect(self._on_finished)
+        QThreadPool.globalInstance().start(worker)
+
+    @Slot()
+    def _on_finished(self):
+        """Worker done — run queued refresh if one was requested."""
+        self._refreshing = False
+        if self._refresh_queued:
+            self._refresh_queued = False
+            self._start_refresh()
 
     @Slot(object)
-    def _on_result(self, payload: object):
-        key, result = payload  # payload is (key, result)
-
-        if key.startswith("price:"):
-            symbol = key.split(":", 1)[1]
-            self._apply_price(symbol, result)  # type: ignore[arg-type]
+    def _on_snapshot(self, snapshot: object):
+        """Apply all data from a single DashboardSnapshot."""
+        if not isinstance(snapshot, DashboardSnapshot):
             return
 
-        if key == "vix":
-            self._apply_vix(result)  # type: ignore[arg-type]
-            return
+        # Prices
+        for symbol, card in self.top_cards.items():
+            s = snapshot.prices.get(symbol, pd.Series(dtype=float))
+            self._apply_price(card, s)
 
-        if key == "fg":
-            self._apply_fg(result)  # type: ignore[arg-type]
-            return
+        # VIX chart
+        self._apply_vix(snapshot.vix)
 
-        if key == "indicators":
-            self._apply_indicators(result)  # type: ignore[arg-type]
-            return
+        # Fear & Greed
+        self._apply_fg(snapshot.fear_greed)
 
-    def _on_failed(self, key: str, exc_info: tuple):
+        # Indicators
+        self._apply_indicators(snapshot.indicators)
+
+    @Slot(tuple)
+    def _on_error(self, exc_info: tuple):
         exc_type, exc_value, _ = exc_info
-        error = f"{exc_type.__name__}: {exc_value}"
-        print(f"[Dashboard] Worker failed: {key} -> {error}")
+        log.warning(
+            "Dashboard refresh failed: %s: %s", exc_type.__name__, exc_value,
+        )
+        # Set all cards to n/a
+        for card in self.top_cards.values():
+            card.set_value(None, None, self._NA_BG)
+        self.vix_curve.setData([], [])
+        for card in self.fg_cards.values():
+            card.set_value("n/a", "data unavailable", self._NA_BG)
+        for spec in self.indicator_specs:
+            self.ind_cards[spec.key].set_value(
+                "n/a", "data unavailable", self._NA_BG,
+            )
 
-        # set "n/a" gracefully
-        if key.startswith("price:"):
-            symbol = key.split(":", 1)[1]
-            self._set_price_na(symbol)
-        elif key == "vix":
-            self.vix_curve.setData([])
-        elif key == "fg":
-            for card in self.fg_cards.values():
-                card.set_value("n/a", "data unavailable", (80, 80, 80, 120))
-        elif key == "indicators":
-            for spec in self.indicator_specs:
-                self.ind_cards[spec.key].set_value("n/a", "data unavailable", (80, 80, 80, 120))
+    # ------------------------------------------------------------------
+    # Apply helpers
+    # ------------------------------------------------------------------
 
-    def _set_price_na(self, symbol: str):
-        card = self.top_cards[symbol]
-        card.set_value(None, None, (80, 80, 80, 120))
+    _NA_BG = (80, 80, 80, 120)
 
-    def _apply_price(self, symbol: str, series_obj: object):
-        card = self.top_cards[symbol]
-        s = series_obj if isinstance(series_obj, pd.Series) else pd.Series(dtype=float)
+    def _apply_price(self, card: PriceChangeCard, s: pd.Series):
         if s is None or len(s) < 2:
-            card.set_value(None, None, (80, 80, 80, 120))
+            card.set_value(None, None, self._NA_BG)
             return
 
         last = float(s.iloc[-1])
@@ -184,34 +236,41 @@ class DashboardTab(QWidget):
         bg = (60, 160, 80, 160) if pct >= 0 else (180, 40, 40, 160)
         card.set_value(last, pct, bg)
 
-    def _apply_vix(self, series_obj: object):
-        s = series_obj if isinstance(series_obj, pd.Series) else pd.Series(dtype=float)
+    def _apply_vix(self, s: pd.Series):
         if s is None or s.empty:
-            self.vix_curve.setData([])
+            self.vix_curve.setData([], [])
             return
-        x = (s.index.view("int64") // 10 ** 9).to_numpy(dtype=np.int64)
-        y = s.to_numpy(dtype=float)
+
+        # Convert tz-aware DatetimeIndex → POSIX seconds (float64).
+        # Using .astype("int64") is safer than .view("int64") across
+        # pandas versions and timezone-aware indices.
+        try:
+            x = s.index.astype("int64").to_numpy(dtype=np.float64) / 1e9
+        except (TypeError, AttributeError):
+            # Fallback for unusual index types
+            x = np.array(
+                [ts.timestamp() for ts in s.index], dtype=np.float64,
+            )
+        y = s.to_numpy(dtype=np.float64)
 
         self.vix_curve.setData(x, y)
         self.vix_plot.getPlotItem().vb.autoRange()
 
-    def _apply_fg(self, fg_obj: object):
-        fg = fg_obj if isinstance(fg_obj, dict) else {}
+    def _apply_fg(self, fg: dict):
         for k, card in self.fg_cards.items():
             val = fg.get(k)
             if not val:
-                card.set_value("n/a", "data unavailable", (80, 80, 80, 120))
+                card.set_value("n/a", "data unavailable", self._NA_BG)
                 continue
             value, label = val
             card.set_value(str(int(value)), str(label), fg_color(int(value)))
 
-    def _apply_indicators(self, ind_obj: object):
-        values = ind_obj if isinstance(ind_obj, dict) else {}
+    def _apply_indicators(self, values: dict):
         for spec in self.indicator_specs:
             card = self.ind_cards[spec.key]
             v = values.get(spec.key)
             if v is None:
-                card.set_value("n/a", "data unavailable", (80, 80, 80, 120))
+                card.set_value("n/a", "data unavailable", self._NA_BG)
                 continue
             color = indicator_color(float(v), spec.bands)
             suffix = f" {spec.unit}".rstrip()

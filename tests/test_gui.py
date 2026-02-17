@@ -161,14 +161,15 @@ class TestMainWindow:
         from insider_scanner.gui.main_window import MainWindow
         win = MainWindow()
         qtbot.addWidget(win)
-        assert win.tabs.count() == 2
+        assert win.tabs.count() == 3
 
     def test_tab_name(self, qtbot):
         from insider_scanner.gui.main_window import MainWindow
         win = MainWindow()
         qtbot.addWidget(win)
-        assert win.tabs.tabText(0) == "Insider Scan"
-        assert win.tabs.tabText(1) == "Congress Scan"
+        assert win.tabs.tabText(0) == "Dashboard"
+        assert win.tabs.tabText(1) == "Insider Scan"
+        assert win.tabs.tabText(2) == "Congress Scan"
 
     def test_status_bar(self, qtbot):
         from insider_scanner.gui.main_window import MainWindow
