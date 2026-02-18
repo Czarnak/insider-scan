@@ -5,13 +5,11 @@ from __future__ import annotations
 import io
 import zipfile
 from datetime import date
-from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import responses
 
 from insider_scanner.core.congress_house import (
-    FILING_TYPE_PTR,
     INDEX_ZIP_URL,
     PTR_PDF_URL,
     _determine_years,
@@ -24,7 +22,6 @@ from insider_scanner.core.congress_house import (
     _parse_table_row,
     ensure_house_index,
     parse_house_index,
-    parse_ptr_pdf,
     refresh_all_indexes,
     refresh_current_year,
     scrape_house_trades,
@@ -470,7 +467,8 @@ class TestTableParsing:
         assert _find_header_row(table) is None
 
     def test_map_columns(self):
-        headers = ["id", "owner", "asset", "transaction\ntype", "date", "notification\ndate", "amount", "cap.\ngains > $200?"]
+        headers = ["id", "owner", "asset", "transaction\ntype", "date", "notification\ndate", "amount",
+                   "cap.\ngains > $200?"]
         col_map = _map_columns(headers)
 
         assert col_map["owner"] == 1
@@ -521,7 +519,8 @@ class TestParsePtrPdf:
         )
         mock_page.extract_tables.return_value = [
             [
-                ["ID", "Owner", "Asset", "Transaction\nType", "Date", "Notification\nDate", "Amount", "Cap.\nGains > $200?"],
+                ["ID", "Owner", "Asset", "Transaction\nType", "Date", "Notification\nDate", "Amount",
+                 "Cap.\nGains > $200?"],
                 ["1", "SP", "Apple Inc (AAPL) [ST]", "P", "01/15/2026", "01/16/2026", "$1,001 - $15,000", ""],
                 ["2", "", "NVIDIA Corporation (NVDA) [ST]", "S", "01/20/2026", "01/21/2026", "$50,001 - $100,000", "Y"],
                 ["3", "JT", "Microsoft Corp (MSFT)", "P", "01/25/2026", "01/26/2026", "$15,001 - $50,000", ""],
@@ -688,7 +687,7 @@ class TestFetchPtrPdf:
         )
 
         with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
-            from insider_scanner.core.congress_house import fetch_ptr_pdf, _pdf_cache_path
+            from insider_scanner.core.congress_house import fetch_ptr_pdf
             data = fetch_ptr_pdf("12345", 2026)
 
         assert data == b"%PDF-1.4 fake pdf content"

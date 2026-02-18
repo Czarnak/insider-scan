@@ -4,19 +4,19 @@ from __future__ import annotations
 
 from datetime import date
 
-from insider_scanner.core.models import InsiderTrade
 from insider_scanner.core.merger import (
     merge_trades,
     filter_trades,
     trades_to_dataframe,
     save_scan_results,
 )
+from insider_scanner.core.models import InsiderTrade
 
 
 def _trade(
-    ticker="AAPL", name="Cook Timothy", trade_type="Sell",
-    trade_date=None, filing_date=None, shares=100_000, price=185.0,
-    value=18_500_000, source="secform4", edgar_url="", is_congress=False,
+        ticker="AAPL", name="Cook Timothy", trade_type="Sell",
+        trade_date=None, filing_date=None, shares=100_000, price=185.0,
+        value=18_500_000, source="secform4", edgar_url="", is_congress=False,
 ) -> InsiderTrade:
     return InsiderTrade(
         ticker=ticker,

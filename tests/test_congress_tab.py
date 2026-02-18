@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from datetime import date
-from pathlib import Path
 from unittest.mock import patch
 
 from insider_scanner.core.models import CongressTrade
@@ -275,8 +274,8 @@ class TestFilterCongressTrades:
 class TestSaveCongressResults:
     def test_saves_csv_and_json(self, tmp_path):
         with patch(
-            "insider_scanner.utils.config.SCAN_OUTPUTS_DIR",
-            new=tmp_path,
+                "insider_scanner.utils.config.SCAN_OUTPUTS_DIR",
+                new=tmp_path,
         ), patch(
             "insider_scanner.utils.config.ensure_dirs",
         ):
@@ -294,8 +293,8 @@ class TestSaveCongressResults:
 
     def test_saves_empty(self, tmp_path):
         with patch(
-            "insider_scanner.utils.config.SCAN_OUTPUTS_DIR",
-            new=tmp_path,
+                "insider_scanner.utils.config.SCAN_OUTPUTS_DIR",
+                new=tmp_path,
         ), patch(
             "insider_scanner.utils.config.ensure_dirs",
         ):

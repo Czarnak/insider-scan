@@ -117,10 +117,10 @@ class PriceChangeCard(QtWidgets.QFrame):
         lay.addStretch(1)
 
     def set_value(
-        self,
-        price_usd: Optional[float],
-        pct_change: Optional[float],
-        bg_rgba: Tuple[int, int, int, int] = (40, 40, 40, 120),
+            self,
+            price_usd: Optional[float],
+            pct_change: Optional[float],
+            bg_rgba: Tuple[int, int, int, int] = (40, 40, 40, 120),
     ):
         if price_usd is None:
             self.price_lbl.setText("n/a")
@@ -176,10 +176,10 @@ class ValueCard(QtWidgets.QFrame):
         lay.addStretch(1)
 
     def set_value(
-        self,
-        value_text: str,
-        meta_text: str = "",
-        bg_rgba: Tuple[int, int, int, int] = (40, 40, 40, 120),
+            self,
+            value_text: str,
+            meta_text: str = "",
+            bg_rgba: Tuple[int, int, int, int] = (40, 40, 40, 120),
     ):
         self.value_lbl.setText(value_text)
         self.meta_lbl.setText(meta_text)
@@ -201,17 +201,17 @@ class ValueCard(QtWidgets.QFrame):
 def fg_color(value: int) -> Tuple[int, int, int, int]:
     """Map a 0–100 Fear & Greed score to an RGBA background color."""
     if value < 25:
-        return (180, 40, 40, 160)    # Extreme Fear — red
+        return (180, 40, 40, 160)  # Extreme Fear — red
     if value < 50:
-        return (200, 120, 40, 160)   # Fear — orange
+        return (200, 120, 40, 160)  # Fear — orange
     if value < 75:
-        return (200, 180, 40, 160)   # Greed — yellow
-    return (60, 160, 80, 160)        # Extreme Greed — green
+        return (200, 180, 40, 160)  # Greed — yellow
+    return (60, 160, 80, 160)  # Extreme Greed — green
 
 
 def indicator_color(
-    value: float,
-    bands: Tuple[Tuple[float, float, str], ...],
+        value: float,
+        bands: Tuple[Tuple[float, float, str], ...],
 ) -> Tuple[int, int, int, int]:
     """Map a numeric value to an RGBA color using band definitions."""
     palette = {

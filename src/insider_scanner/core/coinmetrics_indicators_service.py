@@ -144,7 +144,7 @@ class CoinMetricsIndicatorsService:
         df = self.get_caps(asset, start_time, end_time, force_refresh)
         if df.empty or "CapMrktCurUSD" not in df or "CapRealUSD" not in df:
             log.debug("NUPL: insufficient data (empty=%s, cols=%s)",
-                       df.empty, list(df.columns) if not df.empty else [])
+                      df.empty, list(df.columns) if not df.empty else [])
             return pd.Series(dtype=float, name="nupl")
         return nupl(df["CapMrktCurUSD"], df["CapRealUSD"])
 
@@ -160,7 +160,7 @@ class CoinMetricsIndicatorsService:
         df = self.get_caps(asset, start_time, end_time, force_refresh)
         if df.empty or "CapMrktCurUSD" not in df or "CapRealUSD" not in df:
             log.debug("MVRV-Z: insufficient data (empty=%s, cols=%s)",
-                       df.empty, list(df.columns) if not df.empty else [])
+                      df.empty, list(df.columns) if not df.empty else [])
             return pd.Series(dtype=float, name="mvrv_z_score")
         return mvrv_z_score(df["CapMrktCurUSD"], df["CapRealUSD"], sigma_window=sigma_window, sigma_method=sigma_method)
 

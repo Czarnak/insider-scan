@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -212,8 +211,8 @@ class TestGoldFearGreedClient:
         cache = TTLCache()
         client = GoldFearGreedClient(cache)
         with patch(
-            "insider_scanner.core.dashboard.requests.get",
-            side_effect=ConnectionError("offline"),
+                "insider_scanner.core.dashboard.requests.get",
+                side_effect=ConnectionError("offline"),
         ):
             assert client.get_latest() is None
 
@@ -240,8 +239,8 @@ class TestCryptoFearGreedClient:
         cache = TTLCache()
         client = CryptoFearGreedClient(cache)
         with patch(
-            "insider_scanner.core.dashboard.requests.get",
-            side_effect=ConnectionError,
+                "insider_scanner.core.dashboard.requests.get",
+                side_effect=ConnectionError,
         ):
             assert client.get_latest() is None
 
@@ -290,8 +289,8 @@ class TestCBBIClient:
         cache = TTLCache()
         client = CBBIClient(cache)
         with patch(
-            "insider_scanner.core.dashboard.requests.get",
-            side_effect=ConnectionError,
+                "insider_scanner.core.dashboard.requests.get",
+                side_effect=ConnectionError,
         ):
             assert client.get_latest() is None
 
@@ -462,11 +461,11 @@ class TestMarketProvider:
         provider = MarketProvider()
 
         with patch(
-            "insider_scanner.core.dashboard.yf.download",
-            side_effect=Exception("network down"),
+                "insider_scanner.core.dashboard.yf.download",
+                side_effect=Exception("network down"),
         ):
             with patch.object(
-                provider._gold_fng, "get_latest", return_value=(55, "Greed"),
+                    provider._gold_fng, "get_latest", return_value=(55, "Greed"),
             ):
                 with patch.object(provider._crypto_fng, "get_latest", return_value=None):
                     with patch.object(provider._cbbi, "get_latest", return_value=None):

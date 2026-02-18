@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import requests
 import responses
@@ -12,7 +12,6 @@ from insider_scanner.core.congress_senate import (
     BASE_URL,
     EFDSession,
     REPORT_DATA,
-    REPORT_TYPE_PTR,
     SEARCH_HOME,
     SEARCH_LANDING,
     _extract_ticker,
@@ -20,14 +19,12 @@ from insider_scanner.core.congress_senate import (
     _normalize_tx_type,
     _parse_date,
     _split_name,
-    create_efd_session,
     parse_ptr_page,
     parse_search_results,
     scrape_senate_trades,
     search_senate_filings,
 )
 from insider_scanner.core.models import CongressTrade
-
 
 # -----------------------------------------------------------------------
 # Sample HTML fixtures
@@ -303,7 +300,7 @@ class TestParsePtrPage:
 class TestMapSenateColumns:
     def test_standard_headers(self):
         headers = ["#", "transaction date", "owner", "ticker",
-                    "asset name", "asset type", "type", "amount", "comment"]
+                   "asset name", "asset type", "type", "amount", "comment"]
         col_map = _map_senate_columns(headers)
         assert col_map["id"] == 0
         assert col_map["tx_date"] == 1
@@ -477,7 +474,7 @@ class TestScrapeSentateTrades:
         mock_session.fetch_page.return_value = PTR_PAGE_HTML
 
         with patch(
-            "insider_scanner.core.congress_senate.search_senate_filings"
+                "insider_scanner.core.congress_senate.search_senate_filings"
         ) as mock_search:
             mock_search.return_value = [
                 {
@@ -525,8 +522,8 @@ class TestScrapeSentateTrades:
         mock_session._authenticated = True
 
         with patch(
-            "insider_scanner.core.congress_senate.search_senate_filings",
-            return_value=[],
+                "insider_scanner.core.congress_senate.search_senate_filings",
+                return_value=[],
         ):
             trades = scrape_senate_trades(
                 official_name="Nobody Here",
@@ -544,7 +541,7 @@ class TestScrapeSentateTrades:
         progress_calls = []
 
         with patch(
-            "insider_scanner.core.congress_senate.search_senate_filings",
+                "insider_scanner.core.congress_senate.search_senate_filings",
         ) as mock_search:
             mock_search.return_value = [
                 {
@@ -575,8 +572,8 @@ class TestScrapeSentateTrades:
         mock_session._authenticated = True
 
         with patch(
-            "insider_scanner.core.congress_senate.search_senate_filings",
-            return_value=[],
+                "insider_scanner.core.congress_senate.search_senate_filings",
+                return_value=[],
         ) as mock_search:
             scrape_senate_trades(
                 official_name="Tommy Tuberville",
@@ -597,7 +594,7 @@ class TestScrapeSentateTrades:
         mock_session.fetch_page.side_effect = requests.ConnectionError("timeout")
 
         with patch(
-            "insider_scanner.core.congress_senate.search_senate_filings",
+                "insider_scanner.core.congress_senate.search_senate_filings",
         ) as mock_search:
             mock_search.return_value = [
                 {

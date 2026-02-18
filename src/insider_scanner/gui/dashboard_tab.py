@@ -8,7 +8,7 @@ All data is fetched by a SINGLE background Worker calling
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -42,10 +42,10 @@ class DashboardTab(QWidget):
     """Live-updating dashboard with prices, VIX chart, F&G, and indicators."""
 
     def __init__(
-        self,
-        provider: MarketDataProvider,
-        indicator_specs: List[IndicatorSpec],
-        parent=None,
+            self,
+            provider: MarketDataProvider,
+            indicator_specs: List[IndicatorSpec],
+            parent=None,
     ):
         super().__init__(parent)
         self.provider = provider

@@ -18,12 +18,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 
-import numpy as np
+import fear_and_greed
 import pandas as pd
 import requests
 import yfinance as yf
-
-import fear_and_greed
 
 from insider_scanner.core.coinmetrics_client import CoinMetricsClient
 from insider_scanner.core.coinmetrics_indicators_service import (
@@ -160,10 +158,10 @@ class StockFearGreedClient:
     """CNN Fear & Greed Index via the ``fear_and_greed`` library."""
 
     def __init__(
-        self,
-        cache: TTLCache,
-        ttl_minutes: int = 60,
-        timeout_sec: int = 10,
+            self,
+            cache: TTLCache,
+            ttl_minutes: int = 60,
+            timeout_sec: int = 10,
     ):
         self.cache = cache
         self.ttl = timedelta(minutes=ttl_minutes)
@@ -192,10 +190,10 @@ class GoldFearGreedClient:
     URL = "https://cdn.jmbullion.com/fearandgreed/fearandgreed.json"
 
     def __init__(
-        self,
-        cache: TTLCache,
-        ttl_minutes: int = 60,
-        timeout_sec: int = 10,
+            self,
+            cache: TTLCache,
+            ttl_minutes: int = 60,
+            timeout_sec: int = 10,
     ):
         self.cache = cache
         self.ttl = timedelta(minutes=ttl_minutes)
@@ -229,10 +227,10 @@ class CryptoFearGreedClient:
     URL = "https://api.alternative.me/fng/"
 
     def __init__(
-        self,
-        cache: TTLCache,
-        ttl_minutes: int = 30,
-        timeout_sec: int = 10,
+            self,
+            cache: TTLCache,
+            ttl_minutes: int = 30,
+            timeout_sec: int = 10,
     ):
         self.cache = cache
         self.ttl = timedelta(minutes=ttl_minutes)
@@ -281,10 +279,10 @@ class CBBIClient:
     URL = "https://colintalkscrypto.com/cbbi/data/latest/cbbi"
 
     def __init__(
-        self,
-        cache: TTLCache,
-        ttl_minutes: int = 60,
-        timeout_sec: int = 10,
+            self,
+            cache: TTLCache,
+            ttl_minutes: int = 60,
+            timeout_sec: int = 10,
     ):
         self.cache = cache
         self.ttl = timedelta(minutes=ttl_minutes)
@@ -359,7 +357,7 @@ class MarketProvider:
     # -- yfinance wrappers (NOT thread-safe — call sequentially) ------
 
     def get_daily_close(
-        self, symbol: str, lookback_days: int,
+            self, symbol: str, lookback_days: int,
     ) -> pd.Series:
         cache_key = f"daily_close:{symbol}:{lookback_days}"
         cached = self._cache.get(cache_key)
@@ -534,6 +532,7 @@ class DashboardSnapshot:
 
 class MarketDataProvider(Protocol):
     def fetch_all(self) -> DashboardSnapshot: ...
+
     latest_indicator_values: Dict[str, float]
 
 

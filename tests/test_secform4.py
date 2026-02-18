@@ -13,6 +13,7 @@ from tests.fixtures import SECFORM4_HTML
 # AAPL CIK (raw, not zero-padded)
 AAPL_CIK = "320193"
 
+
 # Fixture rows (filing dates):
 #   KONDO CHRIS        – Sale,     trade 2025-11-07, filing 2025-11-12
 #   Parekh Kevan       – Sale,     trade 2025-10-16, filing 2025-10-17
