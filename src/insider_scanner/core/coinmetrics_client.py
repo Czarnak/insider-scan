@@ -47,16 +47,16 @@ class CoinMetricsClient:
     # Public endpoints
     # -------------------------
     def get_asset_metrics(
-            self,
-            assets: Union[str, Sequence[str]],
-            metrics: Union[str, Sequence[str]],
-            frequency: str = "1d",
-            start_time: Optional[str] = None,
-            end_time: Optional[str] = None,
-            page_size: int = 1000,
-            limit_per_asset: Optional[int] = None,
-            sort: Optional[str] = "time",
-            **extra_params: Any,
+        self,
+        assets: Union[str, Sequence[str]],
+        metrics: Union[str, Sequence[str]],
+        frequency: str = "1d",
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        page_size: int = 1000,
+        limit_per_asset: Optional[int] = None,
+        sort: Optional[str] = "time",
+        **extra_params: Any,
     ) -> pd.DataFrame:
         """
         Fetch /timeseries/asset-metrics with automatic pagination.
@@ -133,7 +133,9 @@ class CoinMetricsClient:
             j = self._get_json(path, params=p)
             data = j.get("data", [])
             if not isinstance(data, list):
-                raise RuntimeError(f"Unexpected response format: 'data' is not a list ({path})")
+                raise RuntimeError(
+                    f"Unexpected response format: 'data' is not a list ({path})"
+                )
 
             out.extend(data)
 
@@ -179,7 +181,9 @@ class CoinMetricsClient:
                 last_err = e
                 if attempt >= self.cfg.max_retries:
                     break
-                sleep_s = (self.cfg.backoff_base_sec * (2 ** attempt)) + random.uniform(0, self.cfg.backoff_jitter_sec)
+                sleep_s = (self.cfg.backoff_base_sec * (2**attempt)) + random.uniform(
+                    0, self.cfg.backoff_jitter_sec
+                )
                 time.sleep(sleep_s)
 
         raise RuntimeError(f"CoinMetrics request failed after retries: {last_err}")

@@ -7,23 +7,25 @@ Free tier limits: 8 requests per hour.  Since on-chain metrics
 update only once per day, we cache responses for 6 hours — meaning
 at most one API call per metric per session.
 
-Response format (plain text, one row per day):
-    2026-02-15 1771113600 0.5243
-    ^date      ^unix_ts   ^value
+Response format (JSON array of daily records):
 
-Some endpoints use European comma decimals (e.g. VDD raw values),
-which the parser handles transparently.
+    [
+      {"d": "2026-02-15", "unixTs": "1771113600", "mvrvZscore": "0.5243"},
+      ...
+    ]
+
+The value field name varies by endpoint (e.g. ``mvrvZscore``, ``nupl``),
+configured in ``INDICATOR_ENDPOINTS``.
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
-
-from datetime import timedelta
 
 log = logging.getLogger(__name__)
 
@@ -31,6 +33,7 @@ log = logging.getLogger(__name__)
 # -------------------------------------------------------------------
 # Configuration
 # -------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class BGeometricsConfig:
@@ -40,13 +43,13 @@ class BGeometricsConfig:
 
 
 # Available indicator endpoints.
-# key → (url_path, human_label)
-INDICATOR_ENDPOINTS: Dict[str, Tuple[str, str]] = {
-    "mvrv_z": ("/mvrv-zscore", "MVRV Z-Score"),
-    "nupl": ("/nupl", "NUPL"),
+# key → (url_path, json_value_field, human_label)
+INDICATOR_ENDPOINTS: Dict[str, Tuple[str, str, str]] = {
+    "mvrv_z": ("/mvrv-zscore", "mvrvZscore", "MVRV Z-Score"),
+    "nupl": ("/nupl", "nupl", "NUPL"),
     # VDD endpoint returns raw CDD-USD values, not the VDD Multiple.
     # Uncomment if BGeometrics adds a vdd-multiple endpoint:
-    # "vdd": ("/vdd", "VDD Multiple"),
+    "vdd": ("/vdd-multiple", "vddMultiple", "VDD Multiple"),
 }
 
 
@@ -54,30 +57,33 @@ INDICATOR_ENDPOINTS: Dict[str, Tuple[str, str]] = {
 # Parser
 # -------------------------------------------------------------------
 
-def parse_text_timeseries(text: str) -> List[Tuple[str, float]]:
-    """Parse BGeometrics plain-text response into (date, value) pairs.
 
-    Each line has the format:
-        YYYY-MM-DD  unix_timestamp  value
+def parse_json_timeseries(
+    data: Any,
+    value_field: str,
+) -> List[Tuple[str, float]]:
+    """Parse a BGeometrics JSON array into (date, value) pairs.
 
-    The value may use a European comma decimal (e.g. ``1234,56``),
-    which is converted to a dot decimal before parsing.
+    Expected input: a list of dicts, each with at least:
+        ``"d"`` (date string) and the specified ``value_field``.
 
-    Blank lines and lines that don't match the expected 3-column
-    format are silently skipped.
+    Values are strings like ``"0.5243"`` and are converted to float.
+    Records with missing or unparseable values are silently skipped.
     """
+    if not isinstance(data, list):
+        return []
+
     rows: List[Tuple[str, float]] = []
-    for line in text.strip().splitlines():
-        parts = line.split()
-        if len(parts) < 3:
+    for record in data:
+        if not isinstance(record, dict):
             continue
-        date_str = parts[0]
-        raw_value = parts[2]
-        # Handle European comma decimal: "1234,56" → "1234.56"
-        raw_value = raw_value.replace(",", ".")
+        date_str = record.get("d")
+        raw_value = record.get(value_field)
+        if date_str is None or raw_value is None:
+            continue
         try:
-            value = float(raw_value)
-        except ValueError:
+            value = float(str(raw_value).replace(",", "."))
+        except (ValueError, TypeError):
             continue
         rows.append((date_str, value))
     return rows
@@ -139,8 +145,8 @@ class BGeometricsClient:
             # Sentinel means "we tried and failed" — return None
             return None if cached is _FETCH_FAILED else cached
 
-        url_path, label = endpoint
-        value = self._fetch_latest_value(url_path, label)
+        url_path, value_field, label = endpoint
+        value = self._fetch_latest_value(url_path, value_field, label)
 
         if value is not None:
             self.cache.set(cache_key, value, self.ttl)
@@ -166,14 +172,18 @@ class BGeometricsClient:
     # -- internals ---------------------------------------------------
 
     def _fetch_latest_value(
-        self, url_path: str, label: str,
+        self,
+        url_path: str,
+        value_field: str,
+        label: str,
     ) -> Optional[float]:
-        """HTTP GET → parse text → return last row's value."""
+        """HTTP GET → parse JSON → return last record's value."""
         url = self.cfg.base_url.rstrip("/") + url_path
         try:
             r = self._session.get(url, timeout=self.cfg.timeout_sec)
             r.raise_for_status()
-            rows = parse_text_timeseries(r.text)
+            data = r.json()
+            rows = parse_json_timeseries(data, value_field)
             if not rows:
                 log.warning("BGeometrics %s: empty response", label)
                 return None

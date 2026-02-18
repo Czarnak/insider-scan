@@ -266,9 +266,21 @@ def parse_secform4_html(html: str, ticker: str = "") -> list[InsiderTrade]:
                 insider_title = parts[1] if len(parts) > 1 else insider_title
 
         # --- Numeric columns ---
-        shares_val = _parse_number(_cell("shares").get_text(strip=True)) if _cell("shares") else 0.0
-        price_val = _parse_number(_cell("price").get_text(strip=True)) if _cell("price") else 0.0
-        value_val = _parse_number(_cell("value").get_text(strip=True)) if _cell("value") else 0.0
+        shares_val = (
+            _parse_number(_cell("shares").get_text(strip=True))
+            if _cell("shares")
+            else 0.0
+        )
+        price_val = (
+            _parse_number(_cell("price").get_text(strip=True))
+            if _cell("price")
+            else 0.0
+        )
+        value_val = (
+            _parse_number(_cell("value").get_text(strip=True))
+            if _cell("value")
+            else 0.0
+        )
 
         # --- Shares owned: first text node, ignore <span class="ownership"> ---
         owned_val = 0.0

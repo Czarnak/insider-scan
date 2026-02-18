@@ -132,13 +132,22 @@ class TestParseAmountRange:
         assert CongressTrade.parse_amount_range("$1,001 - $15,000") == (1001.0, 15000.0)
 
     def test_large_range(self):
-        assert CongressTrade.parse_amount_range("$1,000,001 - $5,000,000") == (1000001.0, 5000000.0)
+        assert CongressTrade.parse_amount_range("$1,000,001 - $5,000,000") == (
+            1000001.0,
+            5000000.0,
+        )
 
     def test_mid_range(self):
-        assert CongressTrade.parse_amount_range("$50,001 - $100,000") == (50001.0, 100000.0)
+        assert CongressTrade.parse_amount_range("$50,001 - $100,000") == (
+            50001.0,
+            100000.0,
+        )
 
     def test_over_pattern(self):
-        assert CongressTrade.parse_amount_range("Over $50,000,000") == (50000000.0, 50000000.0)
+        assert CongressTrade.parse_amount_range("Over $50,000,000") == (
+            50000000.0,
+            50000000.0,
+        )
 
     def test_empty_string(self):
         assert CongressTrade.parse_amount_range("") == (0.0, 0.0)

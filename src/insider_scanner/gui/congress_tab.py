@@ -113,14 +113,14 @@ def congress_trades_to_dataframe(trades: list) -> pd.DataFrame:
 
 
 def filter_congress_trades(
-        trades: list,
-        *,
-        trade_type: str | None = None,
-        min_value: float | None = None,
-        since: date | None = None,
-        until: date | None = None,
-        sector: str | None = None,
-        member_sectors: dict[str, list[str]] | None = None,
+    trades: list,
+    *,
+    trade_type: str | None = None,
+    min_value: float | None = None,
+    since: date | None = None,
+    until: date | None = None,
+    sector: str | None = None,
+    member_sectors: dict[str, list[str]] | None = None,
 ) -> list:
     """Filter CongressTrade records.
 
@@ -155,7 +155,8 @@ def filter_congress_trades(
 
     if sector and sector != "All" and member_sectors:
         result = [
-            t for t in result
+            t
+            for t in result
             if sector in member_sectors.get(t.official_name, ["Other"])
         ]
 
@@ -163,8 +164,8 @@ def filter_congress_trades(
 
 
 def save_congress_results(
-        trades: list,
-        label: str = "congress_scan",
+    trades: list,
+    label: str = "congress_scan",
 ) -> Path:
     """Save Congress scan results as CSV and JSON.
 
@@ -214,8 +215,7 @@ class CongressTab(QWidget):
         self.official_combo.setEditable(True)
         self.official_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.official_combo.setToolTip(
-            "Select a Congress member or type to search. "
-            "'All' scans all members."
+            "Select a Congress member or type to search. 'All' scans all members."
         )
         official_l.addWidget(self.official_combo)
 
@@ -302,8 +302,7 @@ class CongressTab(QWidget):
         self.sector_combo = QComboBox()
         self.sector_combo.addItems(SECTORS)
         self.sector_combo.setToolTip(
-            "Filter by official's committee sector "
-            "(from congress_members.json)"
+            "Filter by official's committee sector (from congress_members.json)"
         )
         filt_l.addWidget(self.sector_combo)
 
@@ -328,18 +327,14 @@ class CongressTab(QWidget):
         table_l = QVBoxLayout(table_widget)
         table_l.setContentsMargins(0, 0, 0, 0)
 
-        self.status_label = QLabel(
-            "Select a Congress member and click Scan Trades"
-        )
+        self.status_label = QLabel("Select a Congress member and click Scan Trades")
         table_l.addWidget(self.status_label)
 
         self.trades_model = SortableTableModel()
         self.trades_table = QTableView()
         self.trades_table.setModel(self.trades_model)
         self.trades_table.setSortingEnabled(True)
-        self.trades_table.setSelectionBehavior(
-            QTableView.SelectionBehavior.SelectRows
-        )
+        self.trades_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.trades_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
@@ -353,9 +348,7 @@ class CongressTab(QWidget):
         bottom_l = QHBoxLayout(bottom)
 
         self.btn_open_filing = QPushButton("Open Filing")
-        self.btn_open_filing.setToolTip(
-            "Open the disclosure filing in browser"
-        )
+        self.btn_open_filing.setToolTip("Open the disclosure filing in browser")
         self.btn_open_filing.clicked.connect(self._open_filing)
         self.btn_open_filing.setEnabled(False)
         bottom_l.addWidget(self.btn_open_filing)
@@ -434,7 +427,8 @@ class CongressTab(QWidget):
 
         if not use_house and not use_senate:
             QMessageBox.warning(
-                self, "Sources",
+                self,
+                "Sources",
                 "Select at least one source (House or Senate).",
             )
             return
@@ -453,8 +447,7 @@ class CongressTab(QWidget):
         cancel = self._cancel_event
 
         self.progress.setFormat(
-            f"Scanning "
-            f"{'all officials' if not official_name else official_name}..."
+            f"Scanning {'all officials' if not official_name else official_name}..."
         )
 
         def work():
@@ -511,9 +504,7 @@ class CongressTab(QWidget):
         self.progress.setVisible(False)
         self._set_scan_buttons_enabled(True)
         exc_type, exc_value, _ = error_info
-        QMessageBox.critical(
-            self, "Scan Error", f"{exc_type.__name__}: {exc_value}"
-        )
+        QMessageBox.critical(self, "Scan Error", f"{exc_type.__name__}: {exc_value}")
 
     # ------------------------------------------------------------------
     # Display + filter
@@ -569,9 +560,7 @@ class CongressTab(QWidget):
         trades = self._filtered_trades or self._trades
         if row < len(trades):
             trade = trades[row]
-            sectors = self._member_sectors.get(
-                trade.official_name, ["Other"]
-            )
+            sectors = self._member_sectors.get(trade.official_name, ["Other"])
             detail = (
                 f"Official: {trade.official_name}  |  "
                 f"Chamber: {trade.chamber}  |  "
@@ -607,12 +596,7 @@ class CongressTab(QWidget):
             return
 
         selected = (
-                self.official_combo.currentText().strip().replace(" ", "_")
-                or "congress"
+            self.official_combo.currentText().strip().replace(" ", "_") or "congress"
         )
-        out = save_congress_results(
-            trades, label=f"{selected}_congress_scan"
-        )
-        QMessageBox.information(
-            self, "Saved", f"Results saved to:\n{out}"
-        )
+        out = save_congress_results(trades, label=f"{selected}_congress_scan")
+        QMessageBox.information(self, "Saved", f"Results saved to:\n{out}")

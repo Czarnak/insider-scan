@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import requests
 import responses
@@ -12,7 +12,6 @@ from insider_scanner.core.congress_senate import (
     BASE_URL,
     EFDSession,
     REPORT_DATA,
-    REPORT_TYPE_PTR,
     SEARCH_HOME,
     SEARCH_LANDING,
     _extract_ticker,
@@ -20,7 +19,6 @@ from insider_scanner.core.congress_senate import (
     _normalize_tx_type,
     _parse_date,
     _split_name,
-    create_efd_session,
     parse_ptr_page,
     parse_search_results,
     scrape_senate_trades,
@@ -164,6 +162,7 @@ PTR_PAGE_NO_TABLE_HTML = """
 # Helper function tests
 # -----------------------------------------------------------------------
 
+
 class TestSplitName:
     def test_first_last(self):
         assert _split_name("Nancy Pelosi") == ("Nancy", "Pelosi")
@@ -227,6 +226,7 @@ class TestParseDate:
 # Search result parsing
 # -----------------------------------------------------------------------
 
+
 class TestParseSearchResults:
     def test_parse_standard(self):
         results = parse_search_results(SEARCH_RESPONSE_JSON)
@@ -265,6 +265,7 @@ class TestParseSearchResults:
 # PTR page parsing
 # -----------------------------------------------------------------------
 
+
 class TestParsePtrPage:
     def test_parse_standard_table(self):
         transactions = parse_ptr_page(PTR_PAGE_HTML)
@@ -302,8 +303,17 @@ class TestParsePtrPage:
 
 class TestMapSenateColumns:
     def test_standard_headers(self):
-        headers = ["#", "transaction date", "owner", "ticker",
-                    "asset name", "asset type", "type", "amount", "comment"]
+        headers = [
+            "#",
+            "transaction date",
+            "owner",
+            "ticker",
+            "asset name",
+            "asset type",
+            "type",
+            "amount",
+            "comment",
+        ]
         col_map = _map_senate_columns(headers)
         assert col_map["id"] == 0
         assert col_map["tx_date"] == 1
@@ -319,6 +329,7 @@ class TestMapSenateColumns:
 # -----------------------------------------------------------------------
 # EFD Session
 # -----------------------------------------------------------------------
+
 
 class TestEFDSession:
     @responses.activate
@@ -364,11 +375,15 @@ class TestEFDSession:
         # Pre-authenticate
         responses.add(responses.GET, SEARCH_LANDING, body=LANDING_HTML, status=200)
         responses.add(
-            responses.POST, SEARCH_HOME, body=SEARCH_FORM_HTML, status=200,
+            responses.POST,
+            SEARCH_HOME,
+            body=SEARCH_FORM_HTML,
+            status=200,
             headers={"Set-Cookie": "csrftoken=tok; Path=/"},
         )
         responses.add(
-            responses.POST, REPORT_DATA,
+            responses.POST,
+            REPORT_DATA,
             json=SEARCH_RESPONSE_JSON,
             status=200,
         )
@@ -392,7 +407,10 @@ class TestEFDSession:
     def test_fetch_page(self):
         responses.add(responses.GET, SEARCH_LANDING, body=LANDING_HTML, status=200)
         responses.add(
-            responses.POST, SEARCH_HOME, body=SEARCH_FORM_HTML, status=200,
+            responses.POST,
+            SEARCH_HOME,
+            body=SEARCH_FORM_HTML,
+            status=200,
             headers={"Set-Cookie": "csrftoken=tok; Path=/"},
         )
         responses.add(
@@ -413,17 +431,22 @@ class TestEFDSession:
 # Integrated search function
 # -----------------------------------------------------------------------
 
+
 class TestSearchSenateFilings:
     @responses.activate
     def test_filters_paper_filings(self):
         # Authenticate
         responses.add(responses.GET, SEARCH_LANDING, body=LANDING_HTML, status=200)
         responses.add(
-            responses.POST, SEARCH_HOME, body=SEARCH_FORM_HTML, status=200,
+            responses.POST,
+            SEARCH_HOME,
+            body=SEARCH_FORM_HTML,
+            status=200,
             headers={"Set-Cookie": "csrftoken=tok; Path=/"},
         )
         responses.add(
-            responses.POST, REPORT_DATA,
+            responses.POST,
+            REPORT_DATA,
             json=SEARCH_RESPONSE_JSON,
             status=200,
         )
@@ -432,7 +455,8 @@ class TestSearchSenateFilings:
         session.authenticate()
 
         results = search_senate_filings(
-            session, last_name="Tuberville",
+            session,
+            last_name="Tuberville",
         )
 
         # 3 results total, 1 paper → 2 electronic
@@ -443,11 +467,15 @@ class TestSearchSenateFilings:
     def test_empty_results(self):
         responses.add(responses.GET, SEARCH_LANDING, body=LANDING_HTML, status=200)
         responses.add(
-            responses.POST, SEARCH_HOME, body=SEARCH_FORM_HTML, status=200,
+            responses.POST,
+            SEARCH_HOME,
+            body=SEARCH_FORM_HTML,
+            status=200,
             headers={"Set-Cookie": "csrftoken=tok; Path=/"},
         )
         responses.add(
-            responses.POST, REPORT_DATA,
+            responses.POST,
+            REPORT_DATA,
             json={"result": "ok", "recordsTotal": 0, "recordsFiltered": 0, "data": []},
             status=200,
         )
@@ -462,6 +490,7 @@ class TestSearchSenateFilings:
 # -----------------------------------------------------------------------
 # Full pipeline
 # -----------------------------------------------------------------------
+
 
 class TestScrapeSentateTrades:
     def test_full_pipeline(self):

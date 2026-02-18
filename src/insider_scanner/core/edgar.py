@@ -7,7 +7,6 @@ as required by https://www.sec.gov/os/accessing-edgar-data.
 from __future__ import annotations
 
 import json
-from datetime import date
 
 from insider_scanner.core.models import InsiderTrade
 from insider_scanner.utils.config import EDGAR_CACHE_DIR
@@ -115,6 +114,7 @@ def _resolve_cik_html(ticker: str, use_cache: bool = True) -> str | None:
 def parse_cik_from_html(html: str) -> str | None:
     """Extract CIK from EDGAR company search result page."""
     from bs4 import BeautifulSoup
+
     soup = BeautifulSoup(html, "lxml")
 
     # Look for CIK in the page (appears in links like /cgi-bin/browse-edgar?action=getcompany&CIK=0000320193)
@@ -129,6 +129,7 @@ def parse_cik_from_html(html: str) -> str | None:
 
     # Alternative: check page text for "CIK" followed by digits
     import re
+
     match = re.search(r"CIK[=:\s]*(\d{4,10})", html)
     if match:
         return match.group(1).zfill(10)

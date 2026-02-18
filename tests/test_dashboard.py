@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -28,6 +27,7 @@ from insider_scanner.core.dashboard import (
 # -------------------------------------------------------------------
 # TTLCache
 # -------------------------------------------------------------------
+
 
 class TestTTLCache:
     def test_set_and_get(self):
@@ -63,18 +63,22 @@ class TestTTLCache:
 # classify_fng
 # -------------------------------------------------------------------
 
+
 class TestClassifyFng:
-    @pytest.mark.parametrize("score,expected", [
-        (0, "Extreme Fear"),
-        (10, "Extreme Fear"),
-        (24, "Extreme Fear"),
-        (25, "Fear"),
-        (49, "Fear"),
-        (50, "Greed"),
-        (74, "Greed"),
-        (75, "Extreme Greed"),
-        (100, "Extreme Greed"),
-    ])
+    @pytest.mark.parametrize(
+        "score,expected",
+        [
+            (0, "Extreme Fear"),
+            (10, "Extreme Fear"),
+            (24, "Extreme Fear"),
+            (25, "Fear"),
+            (49, "Fear"),
+            (50, "Greed"),
+            (74, "Greed"),
+            (75, "Extreme Greed"),
+            (100, "Extreme Greed"),
+        ],
+    )
     def test_classification(self, score, expected):
         assert classify_fng(score) == expected
 
@@ -83,11 +87,13 @@ class TestClassifyFng:
 # _extract_close
 # -------------------------------------------------------------------
 
+
 class TestExtractClose:
     def test_flat_columns(self):
         idx = pd.to_datetime(["2025-01-01", "2025-01-02", "2025-01-03"])
         df = pd.DataFrame(
-            {"Open": [1, 2, 3], "Close": [10.0, 20.0, 30.0]}, index=idx,
+            {"Open": [1, 2, 3], "Close": [10.0, 20.0, 30.0]},
+            index=idx,
         )
         s = _extract_close(df, "AAPL")
         assert len(s) == 3
@@ -98,7 +104,9 @@ class TestExtractClose:
         arrays = [["Close", "Close"], ["^VIX", "SPY"]]
         cols = pd.MultiIndex.from_arrays(arrays)
         df = pd.DataFrame(
-            [[15.0, 500.0], [16.0, 510.0]], index=idx, columns=cols,
+            [[15.0, 500.0], [16.0, 510.0]],
+            index=idx,
+            columns=cols,
         )
         s = _extract_close(df, "^VIX")
         assert len(s) == 2
@@ -128,6 +136,7 @@ class TestExtractClose:
 # -------------------------------------------------------------------
 # calculate_rsi
 # -------------------------------------------------------------------
+
 
 class TestCalculateRsi:
     def _make_series(self, values: list[float]) -> pd.Series:
@@ -185,6 +194,7 @@ class TestCalculateRsi:
 # GoldFearGreedClient
 # -------------------------------------------------------------------
 
+
 class TestGoldFearGreedClient:
     def test_parses_response(self):
         cache = TTLCache()
@@ -193,7 +203,9 @@ class TestGoldFearGreedClient:
         mock_resp.json.return_value = {"2025-06-01": 30, "2025-06-02": 65}
         mock_resp.raise_for_status = MagicMock()
 
-        with patch("insider_scanner.core.dashboard.requests.get", return_value=mock_resp):
+        with patch(
+            "insider_scanner.core.dashboard.requests.get", return_value=mock_resp
+        ):
             result = client.get_latest()
 
         assert result == (65, "Greed")
@@ -222,6 +234,7 @@ class TestGoldFearGreedClient:
 # CryptoFearGreedClient
 # -------------------------------------------------------------------
 
+
 class TestCryptoFearGreedClient:
     def test_parses_response(self):
         cache = TTLCache()
@@ -232,7 +245,9 @@ class TestCryptoFearGreedClient:
         }
         mock_resp.raise_for_status = MagicMock()
 
-        with patch("insider_scanner.core.dashboard.requests.get", return_value=mock_resp):
+        with patch(
+            "insider_scanner.core.dashboard.requests.get", return_value=mock_resp
+        ):
             result = client.get_latest()
         assert result == (22, "Extreme Fear")
 
@@ -250,6 +265,7 @@ class TestCryptoFearGreedClient:
 # CBBIClient
 # -------------------------------------------------------------------
 
+
 class TestCBBIClient:
     def test_parses_confidence_format(self):
         cache = TTLCache()
@@ -258,7 +274,9 @@ class TestCBBIClient:
         mock_resp.json.return_value = {"Confidence": 0.42}
         mock_resp.raise_for_status = MagicMock()
 
-        with patch("insider_scanner.core.dashboard.requests.get", return_value=mock_resp):
+        with patch(
+            "insider_scanner.core.dashboard.requests.get", return_value=mock_resp
+        ):
             result = client.get_latest()
         assert result == 42.0
 
@@ -272,7 +290,9 @@ class TestCBBIClient:
         }
         mock_resp.raise_for_status = MagicMock()
 
-        with patch("insider_scanner.core.dashboard.requests.get", return_value=mock_resp):
+        with patch(
+            "insider_scanner.core.dashboard.requests.get", return_value=mock_resp
+        ):
             result = client.get_latest()
         assert result == 60.0  # latest date, 0.60 * 100
 
@@ -300,6 +320,7 @@ class TestCBBIClient:
 # IndicatorSpec / DEFAULT_INDICATOR_SPECS
 # -------------------------------------------------------------------
 
+
 class TestIndicatorSpec:
     def test_frozen(self):
         spec = IndicatorSpec(key="x", title="X")
@@ -326,6 +347,7 @@ class TestIndicatorSpec:
 # PRICE_SYMBOLS
 # -------------------------------------------------------------------
 
+
 class TestPriceSymbols:
     def test_contains_expected(self):
         assert "GC=F" in PRICE_SYMBOLS  # Gold
@@ -339,6 +361,7 @@ class TestPriceSymbols:
 # -------------------------------------------------------------------
 # DashboardSnapshot
 # -------------------------------------------------------------------
+
 
 class TestDashboardSnapshot:
     def test_defaults(self):
@@ -364,18 +387,22 @@ class TestDashboardSnapshot:
 # MarketProvider
 # -------------------------------------------------------------------
 
+
 class TestMarketProvider:
     def _make_df(self, n: int = 10) -> pd.DataFrame:
         idx = pd.date_range("2025-01-01", periods=n, freq="D")
         return pd.DataFrame(
-            {"Close": [100.0 + i for i in range(n)]}, index=idx,
+            {"Close": [100.0 + i for i in range(n)]},
+            index=idx,
         )
 
     def test_get_daily_close_caches(self):
         provider = MarketProvider()
         fake_df = self._make_df(10)
 
-        with patch("insider_scanner.core.dashboard.yf.download", return_value=fake_df) as mock_dl:
+        with patch(
+            "insider_scanner.core.dashboard.yf.download", return_value=fake_df
+        ) as mock_dl:
             s1 = provider.get_daily_close("AAPL", 5)
             s2 = provider.get_daily_close("AAPL", 5)
         mock_dl.assert_called_once()
@@ -384,7 +411,9 @@ class TestMarketProvider:
 
     def test_get_daily_close_empty(self):
         provider = MarketProvider()
-        with patch("insider_scanner.core.dashboard.yf.download", return_value=pd.DataFrame()):
+        with patch(
+            "insider_scanner.core.dashboard.yf.download", return_value=pd.DataFrame()
+        ):
             s = provider.get_daily_close("FAKE", 5)
         assert s.empty
 
@@ -399,7 +428,9 @@ class TestMarketProvider:
     def test_get_fear_greed_structure(self):
         provider = MarketProvider()
         with patch.object(provider._gold_fng, "get_latest", return_value=(55, "Greed")):
-            with patch.object(provider._crypto_fng, "get_latest", return_value=(30, "Fear")):
+            with patch.object(
+                provider._crypto_fng, "get_latest", return_value=(30, "Fear")
+            ):
                 fg = provider.get_fear_greed()
         assert fg["stocks"] is None
         assert fg["gold"] == (55, "Greed")
@@ -423,7 +454,9 @@ class TestMarketProvider:
         provider = MarketProvider()
         provider.latest_indicator_values = {"mvrv_z": 2.5, "nupl": 0.3}
 
-        with patch("insider_scanner.core.dashboard.yf.download", return_value=pd.DataFrame()):
+        with patch(
+            "insider_scanner.core.dashboard.yf.download", return_value=pd.DataFrame()
+        ):
             with patch.object(provider._cbbi, "get_latest", return_value=None):
                 indicators = provider.get_indicators()
 
@@ -433,7 +466,9 @@ class TestMarketProvider:
     def test_get_indicators_cbbi(self):
         """CBBI is fetched from the CBBI client."""
         provider = MarketProvider()
-        with patch("insider_scanner.core.dashboard.yf.download", return_value=pd.DataFrame()):
+        with patch(
+            "insider_scanner.core.dashboard.yf.download", return_value=pd.DataFrame()
+        ):
             with patch.object(provider._cbbi, "get_latest", return_value=65.0):
                 indicators = provider.get_indicators()
 
@@ -445,8 +480,12 @@ class TestMarketProvider:
         fake_df = self._make_df(30)
 
         with patch("insider_scanner.core.dashboard.yf.download", return_value=fake_df):
-            with patch.object(provider._gold_fng, "get_latest", return_value=(55, "Greed")):
-                with patch.object(provider._crypto_fng, "get_latest", return_value=(30, "Fear")):
+            with patch.object(
+                provider._gold_fng, "get_latest", return_value=(55, "Greed")
+            ):
+                with patch.object(
+                    provider._crypto_fng, "get_latest", return_value=(30, "Fear")
+                ):
                     with patch.object(provider._cbbi, "get_latest", return_value=42.0):
                         snap = provider.fetch_all()
 
@@ -466,9 +505,13 @@ class TestMarketProvider:
             side_effect=Exception("network down"),
         ):
             with patch.object(
-                provider._gold_fng, "get_latest", return_value=(55, "Greed"),
+                provider._gold_fng,
+                "get_latest",
+                return_value=(55, "Greed"),
             ):
-                with patch.object(provider._crypto_fng, "get_latest", return_value=None):
+                with patch.object(
+                    provider._crypto_fng, "get_latest", return_value=None
+                ):
                     with patch.object(provider._cbbi, "get_latest", return_value=None):
                         snap = provider.fetch_all()
 

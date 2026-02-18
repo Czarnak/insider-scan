@@ -14,9 +14,17 @@ from insider_scanner.core.merger import (
 
 
 def _trade(
-    ticker="AAPL", name="Cook Timothy", trade_type="Sell",
-    trade_date=None, filing_date=None, shares=100_000, price=185.0,
-    value=18_500_000, source="secform4", edgar_url="", is_congress=False,
+    ticker="AAPL",
+    name="Cook Timothy",
+    trade_type="Sell",
+    trade_date=None,
+    filing_date=None,
+    shares=100_000,
+    price=185.0,
+    value=18_500_000,
+    source="secform4",
+    edgar_url="",
+    is_congress=False,
 ) -> InsiderTrade:
     return InsiderTrade(
         ticker=ticker,
@@ -79,9 +87,17 @@ class TestMergeTrades:
 class TestFilterTrades:
     def _trades(self):
         return [
-            _trade(ticker="AAPL", trade_type="Sell", value=18_500_000, is_congress=False),
+            _trade(
+                ticker="AAPL", trade_type="Sell", value=18_500_000, is_congress=False
+            ),
             _trade(ticker="MSFT", name="Nadella", trade_type="Buy", value=5_000_000),
-            _trade(ticker="TSLA", name="Tuberville", trade_type="Buy", value=1_000_000, is_congress=True),
+            _trade(
+                ticker="TSLA",
+                name="Tuberville",
+                trade_type="Buy",
+                value=1_000_000,
+                is_congress=True,
+            ),
         ]
 
     def test_filter_by_ticker(self):

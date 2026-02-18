@@ -39,13 +39,15 @@ class MainWindow(QMainWindow):
             from insider_scanner.gui.dashboard_tab import DashboardTab
 
             self.dashboard_tab = DashboardTab(
-                MarketProvider(), DEFAULT_INDICATOR_SPECS,
+                MarketProvider(),
+                DEFAULT_INDICATOR_SPECS,
             )
             self.tabs.addTab(self.dashboard_tab, "Dashboard")
             self.dashboard_tab.refresh_async()
         except Exception as exc:
             self.tabs.addTab(
-                QLabel(f"Dashboard failed to load: {exc}"), "Dashboard",
+                QLabel(f"Dashboard failed to load: {exc}"),
+                "Dashboard",
             )
 
     def _init_scan_tab(self):
@@ -56,7 +58,8 @@ class MainWindow(QMainWindow):
             self.tabs.addTab(self.scan_tab, "Insider Scan")
         except Exception as exc:
             self.tabs.addTab(
-                QLabel(f"Scan tab failed to load: {exc}"), "Scan",
+                QLabel(f"Scan tab failed to load: {exc}"),
+                "Scan",
             )
 
     def _init_congress_tab(self):
@@ -67,7 +70,8 @@ class MainWindow(QMainWindow):
             self.tabs.addTab(self.congress_tab, "Congress Scan")
         except Exception as exc:
             self.tabs.addTab(
-                QLabel(f"Congress tab failed to load: {exc}"), "Congress",
+                QLabel(f"Congress tab failed to load: {exc}"),
+                "Congress",
             )
 
     def log_status(self, message: str):

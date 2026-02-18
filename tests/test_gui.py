@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt
 class TestPandasTableModel:
     def test_set_dataframe(self, qtbot):
         from insider_scanner.gui.widgets import PandasTableModel
+
         model = PandasTableModel()
         df = pd.DataFrame({"ticker": ["AAPL", "MSFT"], "value": [1000.0, 2000.0]})
         model.set_dataframe(df)
@@ -17,6 +18,7 @@ class TestPandasTableModel:
 
     def test_data_formatting(self, qtbot):
         from insider_scanner.gui.widgets import PandasTableModel
+
         model = PandasTableModel()
         df = pd.DataFrame({"val": [1234567.89]})
         model.set_dataframe(df)
@@ -25,6 +27,7 @@ class TestPandasTableModel:
 
     def test_empty(self, qtbot):
         from insider_scanner.gui.widgets import PandasTableModel
+
         model = PandasTableModel()
         assert model.rowCount() == 0
 
@@ -32,6 +35,7 @@ class TestPandasTableModel:
 class TestSortableTableModel:
     def test_set_and_sort(self, qtbot):
         from insider_scanner.gui.widgets import SortableTableModel
+
         model = SortableTableModel()
         df = pd.DataFrame({"name": ["B", "A", "C"], "val": [2, 1, 3]})
         model.set_dataframe(df)
@@ -43,6 +47,7 @@ class TestSortableTableModel:
 class TestScanTab:
     def test_create(self, qtbot):
         from insider_scanner.gui.scan_tab import ScanTab
+
         tab = ScanTab()
         qtbot.addWidget(tab)
         assert tab.btn_scan is not None
@@ -51,6 +56,7 @@ class TestScanTab:
 
     def test_empty_ticker_warning(self, qtbot):
         from insider_scanner.gui.scan_tab import ScanTab
+
         tab = ScanTab()
         qtbot.addWidget(tab)
         # Ticker is empty, scan should not crash
@@ -59,6 +65,7 @@ class TestScanTab:
 
     def test_date_widgets_exist(self, qtbot):
         from insider_scanner.gui.scan_tab import ScanTab
+
         tab = ScanTab()
         qtbot.addWidget(tab)
         assert tab.start_date is not None
@@ -67,6 +74,7 @@ class TestScanTab:
 
     def test_date_toggle_enables_fields(self, qtbot):
         from insider_scanner.gui.scan_tab import ScanTab
+
         tab = ScanTab()
         qtbot.addWidget(tab)
         # Initially disabled
@@ -83,6 +91,7 @@ class TestScanTab:
 
     def test_get_dates_disabled(self, qtbot):
         from insider_scanner.gui.scan_tab import ScanTab
+
         tab = ScanTab()
         qtbot.addWidget(tab)
         # When dates unchecked, helpers return None
@@ -93,6 +102,7 @@ class TestScanTab:
         from datetime import date
         from PySide6.QtCore import QDate
         from insider_scanner.gui.scan_tab import ScanTab
+
         tab = ScanTab()
         qtbot.addWidget(tab)
         tab.chk_use_dates.setChecked(True)
@@ -103,6 +113,7 @@ class TestScanTab:
 
     def test_latest_count_spin_exists(self, qtbot):
         from insider_scanner.gui.scan_tab import ScanTab
+
         tab = ScanTab()
         qtbot.addWidget(tab)
         assert tab.latest_count_spin is not None
@@ -112,6 +123,7 @@ class TestScanTab:
 
     def test_latest_count_spin_change(self, qtbot):
         from insider_scanner.gui.scan_tab import ScanTab
+
         tab = ScanTab()
         qtbot.addWidget(tab)
         tab.latest_count_spin.setValue(250)
@@ -119,6 +131,7 @@ class TestScanTab:
 
     def test_watchlist_button_exists(self, qtbot):
         from insider_scanner.gui.scan_tab import ScanTab
+
         tab = ScanTab()
         qtbot.addWidget(tab)
         assert tab.btn_watchlist is not None
@@ -126,6 +139,7 @@ class TestScanTab:
 
     def test_set_scan_buttons_enabled(self, qtbot):
         from insider_scanner.gui.scan_tab import ScanTab
+
         tab = ScanTab()
         qtbot.addWidget(tab)
         tab._set_scan_buttons_enabled(False)
@@ -141,6 +155,7 @@ class TestScanTab:
 
     def test_stop_button_exists(self, qtbot):
         from insider_scanner.gui.scan_tab import ScanTab
+
         tab = ScanTab()
         qtbot.addWidget(tab)
         assert tab.btn_stop is not None
@@ -149,6 +164,7 @@ class TestScanTab:
 
     def test_stop_scan_sets_cancel_event(self, qtbot):
         from insider_scanner.gui.scan_tab import ScanTab
+
         tab = ScanTab()
         qtbot.addWidget(tab)
         assert not tab._cancel_event.is_set()
@@ -159,12 +175,14 @@ class TestScanTab:
 class TestMainWindow:
     def test_create(self, qtbot):
         from insider_scanner.gui.main_window import MainWindow
+
         win = MainWindow()
         qtbot.addWidget(win)
         assert win.tabs.count() == 3
 
     def test_tab_name(self, qtbot):
         from insider_scanner.gui.main_window import MainWindow
+
         win = MainWindow()
         qtbot.addWidget(win)
         assert win.tabs.tabText(0) == "Dashboard"
@@ -173,6 +191,7 @@ class TestMainWindow:
 
     def test_status_bar(self, qtbot):
         from insider_scanner.gui.main_window import MainWindow
+
         win = MainWindow()
         qtbot.addWidget(win)
         win.log_status("Testing")
@@ -182,6 +201,7 @@ class TestMainWindow:
 class TestCongressTab:
     def test_create(self, qtbot):
         from insider_scanner.gui.congress_tab import CongressTab
+
         tab = CongressTab()
         qtbot.addWidget(tab)
         assert tab.btn_scan is not None
@@ -192,6 +212,7 @@ class TestCongressTab:
 
     def test_source_checkboxes(self, qtbot):
         from insider_scanner.gui.congress_tab import CongressTab
+
         tab = CongressTab()
         qtbot.addWidget(tab)
         assert tab.chk_house.isChecked()
@@ -199,6 +220,7 @@ class TestCongressTab:
 
     def test_official_combo(self, qtbot):
         from insider_scanner.gui.congress_tab import CongressTab
+
         tab = CongressTab()
         qtbot.addWidget(tab)
         assert tab.official_combo.count() >= 1
@@ -207,6 +229,7 @@ class TestCongressTab:
 
     def test_date_toggle(self, qtbot):
         from insider_scanner.gui.congress_tab import CongressTab
+
         tab = CongressTab()
         qtbot.addWidget(tab)
         assert not tab.start_date.isEnabled()
@@ -216,6 +239,7 @@ class TestCongressTab:
 
     def test_type_combo(self, qtbot):
         from insider_scanner.gui.congress_tab import CongressTab
+
         tab = CongressTab()
         qtbot.addWidget(tab)
         items = [tab.type_combo.itemText(i) for i in range(tab.type_combo.count())]
@@ -225,6 +249,7 @@ class TestCongressTab:
 
     def test_sector_combo(self, qtbot):
         from insider_scanner.gui.congress_tab import CongressTab
+
         tab = CongressTab()
         qtbot.addWidget(tab)
         items = [tab.sector_combo.itemText(i) for i in range(tab.sector_combo.count())]
@@ -234,6 +259,7 @@ class TestCongressTab:
 
     def test_set_scan_buttons_enabled(self, qtbot):
         from insider_scanner.gui.congress_tab import CongressTab
+
         tab = CongressTab()
         qtbot.addWidget(tab)
         tab._set_scan_buttons_enabled(False)
@@ -245,6 +271,7 @@ class TestCongressTab:
 
     def test_stop_sets_cancel_event(self, qtbot):
         from insider_scanner.gui.congress_tab import CongressTab
+
         tab = CongressTab()
         qtbot.addWidget(tab)
         assert not tab._cancel_event.is_set()
@@ -253,6 +280,7 @@ class TestCongressTab:
 
     def test_display_empty_trades(self, qtbot):
         from insider_scanner.gui.congress_tab import CongressTab
+
         tab = CongressTab()
         qtbot.addWidget(tab)
         tab._display_trades([])

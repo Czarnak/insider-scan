@@ -16,15 +16,20 @@ def _parse_date_arg(value: str) -> date:
     try:
         return date.fromisoformat(value)
     except ValueError:
-        raise argparse.ArgumentTypeError(f"Invalid date format: {value!r} (expected YYYY-MM-DD)")
+        raise argparse.ArgumentTypeError(
+            f"Invalid date format: {value!r} (expected YYYY-MM-DD)"
+        )
 
 
 def cmd_scan(args: argparse.Namespace) -> None:
     """Scan for insider trades on a ticker."""
     from insider_scanner.core.secform4 import scrape_ticker as sf4_scrape
     from insider_scanner.core.openinsider import scrape_ticker as oi_scrape
-    from insider_scanner.core.merger import merge_trades, filter_trades, save_scan_results
-    from insider_scanner.core.senate import flag_congress_trades
+    from insider_scanner.core.merger import (
+        merge_trades,
+        filter_trades,
+        save_scan_results,
+    )
 
     ticker = args.ticker.upper()
     since = getattr(args, "since", None)
@@ -32,12 +37,15 @@ def cmd_scan(args: argparse.Namespace) -> None:
     log.info("Scanning insider trades for %s...", ticker)
 
     # Scrape from both sources (pass date range to scrapers)
-    sf4_trades = sf4_scrape(ticker, use_cache=not args.no_cache, start_date=since, end_date=until)
-    oi_trades = oi_scrape(ticker, use_cache=not args.no_cache, start_date=since, end_date=until)
+    sf4_trades = sf4_scrape(
+        ticker, use_cache=not args.no_cache, start_date=since, end_date=until
+    )
+    oi_trades = oi_scrape(
+        ticker, use_cache=not args.no_cache, start_date=since, end_date=until
+    )
 
     # Merge and flag
     merged = merge_trades(sf4_trades, oi_trades)
-    flag_congress_trades(merged)
 
     # Filter
     filtered = filter_trades(
@@ -69,15 +77,15 @@ def cmd_scan(args: argparse.Namespace) -> None:
 def cmd_latest(args: argparse.Namespace) -> None:
     """Fetch latest insider trades across all tickers."""
     from insider_scanner.core.openinsider import scrape_latest
-    from insider_scanner.core.senate import flag_congress_trades
 
     since = getattr(args, "since", None)
     until = getattr(args, "until", None)
     trades = scrape_latest(
-        count=args.count, use_cache=not args.no_cache,
-        start_date=since, end_date=until,
+        count=args.count,
+        use_cache=not args.no_cache,
+        start_date=since,
+        end_date=until,
     )
-    flag_congress_trades(trades)
 
     print(f"\nLatest {len(trades)} insider trades:")
     for t in trades[:30]:
@@ -89,6 +97,7 @@ def cmd_latest(args: argparse.Namespace) -> None:
 
     if args.save:
         from insider_scanner.core.merger import save_scan_results
+
         save_scan_results(trades, label="latest_scan")
 
 
@@ -125,11 +134,21 @@ def build_parser() -> argparse.ArgumentParser:
     # scan
     p_scan = sub.add_parser("scan", help="Scan insider trades for a ticker")
     p_scan.add_argument("ticker", help="Stock ticker symbol")
-    p_scan.add_argument("--type", choices=["Buy", "Sell", "Exercise", "Other"], default=None)
-    p_scan.add_argument("--min-value", type=float, default=None, help="Minimum trade value ($)")
-    p_scan.add_argument("--congress-only", action="store_true", help="Only show Congress trades")
-    p_scan.add_argument("--since", type=_parse_date_arg, default=None, help="Start date YYYY-MM-DD")
-    p_scan.add_argument("--until", type=_parse_date_arg, default=None, help="End date YYYY-MM-DD")
+    p_scan.add_argument(
+        "--type", choices=["Buy", "Sell", "Exercise", "Other"], default=None
+    )
+    p_scan.add_argument(
+        "--min-value", type=float, default=None, help="Minimum trade value ($)"
+    )
+    p_scan.add_argument(
+        "--congress-only", action="store_true", help="Only show Congress trades"
+    )
+    p_scan.add_argument(
+        "--since", type=_parse_date_arg, default=None, help="Start date YYYY-MM-DD"
+    )
+    p_scan.add_argument(
+        "--until", type=_parse_date_arg, default=None, help="End date YYYY-MM-DD"
+    )
     p_scan.add_argument("--save", action="store_true", help="Save results to outputs/")
     p_scan.add_argument("--no-cache", action="store_true", help="Skip cache")
     p_scan.set_defaults(func=cmd_scan)
@@ -137,8 +156,12 @@ def build_parser() -> argparse.ArgumentParser:
     # latest
     p_latest = sub.add_parser("latest", help="Fetch latest insider trades")
     p_latest.add_argument("--count", type=int, default=100, help="Number of trades")
-    p_latest.add_argument("--since", type=_parse_date_arg, default=None, help="Start date YYYY-MM-DD")
-    p_latest.add_argument("--until", type=_parse_date_arg, default=None, help="End date YYYY-MM-DD")
+    p_latest.add_argument(
+        "--since", type=_parse_date_arg, default=None, help="Start date YYYY-MM-DD"
+    )
+    p_latest.add_argument(
+        "--until", type=_parse_date_arg, default=None, help="End date YYYY-MM-DD"
+    )
     p_latest.add_argument("--save", action="store_true")
     p_latest.add_argument("--no-cache", action="store_true")
     p_latest.set_defaults(func=cmd_latest)

@@ -5,13 +5,11 @@ from __future__ import annotations
 import io
 import zipfile
 from datetime import date
-from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import responses
 
 from insider_scanner.core.congress_house import (
-    FILING_TYPE_PTR,
     INDEX_ZIP_URL,
     PTR_PDF_URL,
     _determine_years,
@@ -24,7 +22,6 @@ from insider_scanner.core.congress_house import (
     _parse_table_row,
     ensure_house_index,
     parse_house_index,
-    parse_ptr_pdf,
     refresh_all_indexes,
     refresh_current_year,
     scrape_house_trades,
@@ -122,6 +119,7 @@ def _make_sample_zip(xml_content: str = SAMPLE_INDEX_XML, year: int = 2026) -> b
 # Helper function tests
 # -----------------------------------------------------------------------
 
+
 class TestExtractTicker:
     def test_standard(self):
         assert _extract_ticker("Apple Inc (AAPL) [ST]") == "AAPL"
@@ -217,12 +215,15 @@ class TestDetermineYears:
 # XML index parsing
 # -----------------------------------------------------------------------
 
+
 class TestParseHouseIndex:
     def test_parse_sample(self, tmp_path):
         xml_path = tmp_path / "2026FD.xml"
         xml_path.write_text(SAMPLE_INDEX_XML, encoding="utf-8")
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             filings = parse_house_index(2026)
 
         assert len(filings) == 6
@@ -242,13 +243,17 @@ class TestParseHouseIndex:
         xml_path = tmp_path / "2026FD.xml"
         xml_path.write_bytes(b"\xef\xbb\xbf" + SAMPLE_INDEX_XML.encode("utf-8"))
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             filings = parse_house_index(2026)
 
         assert len(filings) == 6
 
     def test_missing_file(self, tmp_path):
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             filings = parse_house_index(2099)
         assert filings == []
 
@@ -258,7 +263,9 @@ class TestSearchFilings:
         xml_path = tmp_path / "2026FD.xml"
         xml_path.write_text(SAMPLE_INDEX_XML, encoding="utf-8")
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             results = search_filings(2026, filing_type="P")
 
         # 4 PTR filings: Allen, Beyer x2, Pelosi (Amador is C, Biggs is A)
@@ -269,7 +276,9 @@ class TestSearchFilings:
         xml_path = tmp_path / "2026FD.xml"
         xml_path.write_text(SAMPLE_INDEX_XML, encoding="utf-8")
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             results = search_filings(2026, name="Beyer Donald")
 
         assert len(results) == 2
@@ -279,7 +288,9 @@ class TestSearchFilings:
         xml_path = tmp_path / "2026FD.xml"
         xml_path.write_text(SAMPLE_INDEX_XML, encoding="utf-8")
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             results = search_filings(2026, name="Nancy Pelosi")
 
         assert len(results) == 1
@@ -289,7 +300,9 @@ class TestSearchFilings:
         xml_path = tmp_path / "2026FD.xml"
         xml_path.write_text(SAMPLE_INDEX_XML, encoding="utf-8")
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             results = search_filings(
                 2026,
                 filing_type="P",
@@ -306,7 +319,9 @@ class TestSearchFilings:
         xml_path = tmp_path / "2026FD.xml"
         xml_path.write_text(SAMPLE_INDEX_XML, encoding="utf-8")
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             results = search_filings(2026, name=None, filing_type="P")
 
         assert len(results) == 4
@@ -315,7 +330,9 @@ class TestSearchFilings:
         xml_path = tmp_path / "2026FD.xml"
         xml_path.write_text(SAMPLE_INDEX_XML, encoding="utf-8")
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             results = search_filings(2026, name="Nonexistent Person")
 
         assert results == []
@@ -324,6 +341,7 @@ class TestSearchFilings:
 # -----------------------------------------------------------------------
 # Index download (ensure_house_index)
 # -----------------------------------------------------------------------
+
 
 class TestEnsureHouseIndex:
     @responses.activate
@@ -336,7 +354,9 @@ class TestEnsureHouseIndex:
             status=200,
         )
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             result = ensure_house_index(2026)
 
         assert result == tmp_path / "2026FD.xml"
@@ -348,7 +368,9 @@ class TestEnsureHouseIndex:
         xml_path = tmp_path / "2026FD.xml"
         xml_path.write_text("<FinancialDisclosure></FinancialDisclosure>")
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             result = ensure_house_index(2026)
 
         assert result == xml_path
@@ -368,7 +390,9 @@ class TestEnsureHouseIndex:
             status=200,
         )
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             ensure_house_index(2026, force=True)
 
         # File should be replaced with new content
@@ -384,7 +408,10 @@ class TestEnsureHouseIndex:
         )
 
         import requests as req
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             try:
                 ensure_house_index(2099)
                 assert False, "Should have raised"
@@ -404,7 +431,9 @@ class TestRefreshFunctions:
             status=200,
         )
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             result = refresh_current_year()
 
         assert result is not None
@@ -421,7 +450,9 @@ class TestRefreshFunctions:
                 status=200,
             )
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             results = refresh_all_indexes(years=[2025, 2026])
 
         assert 2025 in results
@@ -442,7 +473,9 @@ class TestRefreshFunctions:
             status=500,
         )
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             results = refresh_all_indexes(years=[2025, 2026])
 
         assert 2025 in results
@@ -452,6 +485,7 @@ class TestRefreshFunctions:
 # -----------------------------------------------------------------------
 # PDF parsing helpers
 # -----------------------------------------------------------------------
+
 
 class TestTableParsing:
     def test_find_header_row(self):
@@ -470,7 +504,16 @@ class TestTableParsing:
         assert _find_header_row(table) is None
 
     def test_map_columns(self):
-        headers = ["id", "owner", "asset", "transaction\ntype", "date", "notification\ndate", "amount", "cap.\ngains > $200?"]
+        headers = [
+            "id",
+            "owner",
+            "asset",
+            "transaction\ntype",
+            "date",
+            "notification\ndate",
+            "amount",
+            "cap.\ngains > $200?",
+        ]
         col_map = _map_columns(headers)
 
         assert col_map["owner"] == 1
@@ -510,21 +553,56 @@ class TestTableParsing:
 # PDF parsing (mock pdfplumber)
 # -----------------------------------------------------------------------
 
+
 class TestParsePtrPdf:
     def test_electronic_pdf(self):
         """Mock pdfplumber to simulate an electronic PTR PDF."""
         mock_page = MagicMock()
         mock_page.extract_text.return_value = (
-            "PERIODIC TRANSACTION REPORT\n"
-            "Filing Information\n"
-            "Asset details..."
+            "PERIODIC TRANSACTION REPORT\nFiling Information\nAsset details..."
         )
         mock_page.extract_tables.return_value = [
             [
-                ["ID", "Owner", "Asset", "Transaction\nType", "Date", "Notification\nDate", "Amount", "Cap.\nGains > $200?"],
-                ["1", "SP", "Apple Inc (AAPL) [ST]", "P", "01/15/2026", "01/16/2026", "$1,001 - $15,000", ""],
-                ["2", "", "NVIDIA Corporation (NVDA) [ST]", "S", "01/20/2026", "01/21/2026", "$50,001 - $100,000", "Y"],
-                ["3", "JT", "Microsoft Corp (MSFT)", "P", "01/25/2026", "01/26/2026", "$15,001 - $50,000", ""],
+                [
+                    "ID",
+                    "Owner",
+                    "Asset",
+                    "Transaction\nType",
+                    "Date",
+                    "Notification\nDate",
+                    "Amount",
+                    "Cap.\nGains > $200?",
+                ],
+                [
+                    "1",
+                    "SP",
+                    "Apple Inc (AAPL) [ST]",
+                    "P",
+                    "01/15/2026",
+                    "01/16/2026",
+                    "$1,001 - $15,000",
+                    "",
+                ],
+                [
+                    "2",
+                    "",
+                    "NVIDIA Corporation (NVDA) [ST]",
+                    "S",
+                    "01/20/2026",
+                    "01/21/2026",
+                    "$50,001 - $100,000",
+                    "Y",
+                ],
+                [
+                    "3",
+                    "JT",
+                    "Microsoft Corp (MSFT)",
+                    "P",
+                    "01/25/2026",
+                    "01/26/2026",
+                    "$15,001 - $50,000",
+                    "",
+                ],
             ]
         ]
 
@@ -533,9 +611,12 @@ class TestParsePtrPdf:
         mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
         mock_pdf.__exit__ = MagicMock(return_value=False)
 
-        with patch("insider_scanner.core.congress_house.pdfplumber", create=True) as mock_plumber:
+        with patch(
+            "insider_scanner.core.congress_house.pdfplumber", create=True
+        ) as mock_plumber:
             # Need to patch the import inside the function
             import insider_scanner.core.congress_house as mod
+
             with patch.dict("sys.modules", {"pdfplumber": mock_plumber}):
                 mock_plumber.open.return_value = mock_pdf
                 transactions = mod.parse_ptr_pdf(b"fake pdf bytes")
@@ -560,8 +641,10 @@ class TestParsePtrPdf:
         mock_pdf.__exit__ = MagicMock(return_value=False)
 
         import insider_scanner.core.congress_house as mod
+
         with patch.dict("sys.modules", {"pdfplumber": MagicMock()}) as _:
             import sys
+
             mock_plumber = sys.modules["pdfplumber"]
             mock_plumber.open.return_value = mock_pdf
             transactions = mod.parse_ptr_pdf(b"fake scanned pdf")
@@ -572,6 +655,7 @@ class TestParsePtrPdf:
 # -----------------------------------------------------------------------
 # Full pipeline (scrape_house_trades)
 # -----------------------------------------------------------------------
+
 
 class TestScrapeHouseTrades:
     @responses.activate
@@ -603,8 +687,13 @@ class TestScrapeHouseTrades:
         ]
 
         with (
-            patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path),
-            patch("insider_scanner.core.congress_house.parse_ptr_pdf", return_value=mock_transactions),
+            patch(
+                "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+            ),
+            patch(
+                "insider_scanner.core.congress_house.parse_ptr_pdf",
+                return_value=mock_transactions,
+            ),
         ):
             trades = scrape_house_trades(
                 official_name="Nancy Pelosi",
@@ -631,7 +720,9 @@ class TestScrapeHouseTrades:
         xml_path = tmp_path / "2026FD.xml"
         xml_path.write_text(SAMPLE_INDEX_XML, encoding="utf-8")
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             trades = scrape_house_trades(
                 official_name="Nobody Here",
                 date_from=date(2026, 1, 1),
@@ -655,14 +746,18 @@ class TestScrapeHouseTrades:
         progress_calls = []
 
         with (
-            patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path),
+            patch(
+                "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+            ),
             patch("insider_scanner.core.congress_house.parse_ptr_pdf", return_value=[]),
         ):
             scrape_house_trades(
                 official_name="Nancy Pelosi",
                 date_from=date(2026, 1, 1),
                 date_to=date(2026, 12, 31),
-                progress_callback=lambda cur, tot, msg: progress_calls.append((cur, tot, msg)),
+                progress_callback=lambda cur, tot, msg: progress_calls.append(
+                    (cur, tot, msg)
+                ),
             )
 
         responses.stop()
@@ -677,6 +772,7 @@ class TestScrapeHouseTrades:
 # PDF fetch + caching
 # -----------------------------------------------------------------------
 
+
 class TestFetchPtrPdf:
     @responses.activate
     def test_download_and_cache(self, tmp_path):
@@ -687,8 +783,11 @@ class TestFetchPtrPdf:
             status=200,
         )
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
-            from insider_scanner.core.congress_house import fetch_ptr_pdf, _pdf_cache_path
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
+            from insider_scanner.core.congress_house import fetch_ptr_pdf
+
             data = fetch_ptr_pdf("12345", 2026)
 
         assert data == b"%PDF-1.4 fake pdf content"
@@ -700,8 +799,11 @@ class TestFetchPtrPdf:
         cached = pdf_dir / "12345.pdf"
         cached.write_bytes(b"cached pdf")
 
-        with patch("insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path):
+        with patch(
+            "insider_scanner.core.congress_house.HOUSE_DISCLOSURES_DIR", tmp_path
+        ):
             from insider_scanner.core.congress_house import fetch_ptr_pdf
+
             data = fetch_ptr_pdf("12345", 2026)
 
         assert data == b"cached pdf"

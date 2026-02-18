@@ -82,6 +82,7 @@ _AMOUNT_RANGES = [
 # Index management — ZIP download + extraction
 # -----------------------------------------------------------------------
 
+
 def _index_xml_path(year: int) -> Path:
     """Path where the extracted XML index lives."""
     return HOUSE_DISCLOSURES_DIR / f"{year}FD.xml"
@@ -144,9 +145,7 @@ def ensure_house_index(year: int, *, force: bool = False) -> Path:
                 log.info("Extracted %s", name)
 
     if not xml_path.exists():
-        raise FileNotFoundError(
-            f"ZIP did not contain expected {year}FD.xml"
-        )
+        raise FileNotFoundError(f"ZIP did not contain expected {year}FD.xml")
 
     return xml_path
 
@@ -192,6 +191,7 @@ def refresh_current_year() -> Path | None:
 # XML index parsing
 # -----------------------------------------------------------------------
 
+
 def parse_house_index(year: int) -> list[dict]:
     """Parse the House financial disclosure XML index for a given year.
 
@@ -230,29 +230,31 @@ def parse_house_index(year: int) -> list[dict]:
             except ValueError:
                 log.debug("Unparseable filing date: %s", filing_date_str)
 
-        filings.append({
-            "prefix": prefix,
-            "last": last,
-            "first": first,
-            "suffix": suffix,
-            "filing_type": filing_type,
-            "state_dst": state_dst,
-            "year": int(year_str) if year_str.isdigit() else year,
-            "filing_date": filing_date,
-            "doc_id": doc_id,
-        })
+        filings.append(
+            {
+                "prefix": prefix,
+                "last": last,
+                "first": first,
+                "suffix": suffix,
+                "filing_type": filing_type,
+                "state_dst": state_dst,
+                "year": int(year_str) if year_str.isdigit() else year,
+                "filing_date": filing_date,
+                "doc_id": doc_id,
+            }
+        )
 
     log.info("Parsed %d filings from %d index", len(filings), year)
     return filings
 
 
 def search_filings(
-        year: int,
-        *,
-        name: str | None = None,
-        filing_type: str = FILING_TYPE_PTR,
-        date_from: date | None = None,
-        date_to: date | None = None,
+    year: int,
+    *,
+    name: str | None = None,
+    filing_type: str = FILING_TYPE_PTR,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> list[dict]:
     """Search the House index for matching filings.
 
@@ -286,14 +288,16 @@ def search_filings(
         if name_lower:
             last_first = f"{f['last']} {f['first']}".lower().strip()
             first_last = f"{f['first']} {f['last']}".lower().strip()
-            official = f"{f['prefix']} {f['first']} {f['last']} {f['suffix']}".lower().strip()
+            official = (
+                f"{f['prefix']} {f['first']} {f['last']} {f['suffix']}".lower().strip()
+            )
 
             if not (
-                    name_lower in last_first
-                    or name_lower in first_last
-                    or name_lower in official
-                    or last_first in name_lower
-                    or first_last in name_lower
+                name_lower in last_first
+                or name_lower in first_last
+                or name_lower in official
+                or last_first in name_lower
+                or first_last in name_lower
             ):
                 continue
 
@@ -313,6 +317,7 @@ def search_filings(
 # -----------------------------------------------------------------------
 # PDF download
 # -----------------------------------------------------------------------
+
 
 def fetch_ptr_pdf(doc_id: str, year: int, *, force: bool = False) -> bytes:
     """Download a PTR PDF and return its raw bytes.
@@ -345,6 +350,7 @@ def fetch_ptr_pdf(doc_id: str, year: int, *, force: bool = False) -> bytes:
 # PDF parsing (pdfplumber — electronic filings only)
 # -----------------------------------------------------------------------
 
+
 def _extract_ticker(asset_description: str) -> str:
     """Try to extract a ticker symbol from an asset description.
 
@@ -357,7 +363,9 @@ def _extract_ticker(asset_description: str) -> str:
 def _normalize_tx_type(raw: str) -> str:
     """Normalize transaction type string to Purchase/Sale/Exchange/Other."""
     raw_stripped = raw.strip()
-    return _TX_TYPE_MAP.get(raw_stripped, _TX_TYPE_MAP.get(raw_stripped.lower(), "Other"))
+    return _TX_TYPE_MAP.get(
+        raw_stripped, _TX_TYPE_MAP.get(raw_stripped.lower(), "Other")
+    )
 
 
 def _normalize_owner(raw: str) -> str:
@@ -437,7 +445,7 @@ def parse_ptr_pdf(pdf_bytes: bytes) -> list[dict]:
                         continue  # Not a transaction table
 
                     # Parse data rows
-                    for row in table[header_idx + 1:]:
+                    for row in table[header_idx + 1 :]:
                         if not row or all(not (cell or "").strip() for cell in row):
                             continue
 
@@ -478,7 +486,11 @@ def _map_columns(headers: list[str]) -> dict[str, int]:
             col_map["transaction"] = i
         elif "notification" in h_lower or "notified" in h_lower:
             col_map["notification_date"] = i
-        elif "date" in h_lower and "notification" not in h_lower and "date" not in col_map:
+        elif (
+            "date" in h_lower
+            and "notification" not in h_lower
+            and "date" not in col_map
+        ):
             col_map["date"] = i
         elif "amount" in h_lower:
             col_map["amount"] = i
@@ -516,12 +528,13 @@ def _parse_table_row(row: list, col_map: dict[str, int]) -> dict | None:
 # Full pipeline: index → PDFs → CongressTrade records
 # -----------------------------------------------------------------------
 
+
 def scrape_house_trades(
-        *,
-        official_name: str | None = None,
-        date_from: date | None = None,
-        date_to: date | None = None,
-        progress_callback: callable | None = None,
+    *,
+    official_name: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    progress_callback: callable | None = None,
 ) -> list[CongressTrade]:
     """Scrape House PTR filings and return parsed CongressTrade records.
 
@@ -618,14 +631,13 @@ def scrape_house_trades(
 
     log.info(
         "Scraped %d trades from %d House PTR filings",
-        len(all_trades), total,
+        len(all_trades),
+        total,
     )
     return all_trades
 
 
-def _determine_years(
-        date_from: date | None, date_to: date | None
-) -> list[int]:
+def _determine_years(date_from: date | None, date_to: date | None) -> list[int]:
     """Determine which year indexes need to be fetched for the date range."""
     current_year = date.today().year
 

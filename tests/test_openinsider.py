@@ -6,7 +6,11 @@ from datetime import date
 
 import responses
 
-from insider_scanner.core.openinsider import parse_openinsider_html, scrape_ticker, scrape_latest
+from insider_scanner.core.openinsider import (
+    parse_openinsider_html,
+    scrape_ticker,
+    scrape_latest,
+)
 from tests.fixtures import OPENINSIDER_HTML
 
 
@@ -98,14 +102,17 @@ class TestScrapeOpeninsider:
             status=200,
         )
         trades = scrape_ticker(
-            "AAPL", use_cache=False,
+            "AAPL",
+            use_cache=False,
             start_date=date(2025, 6, 1),
             end_date=date(2025, 12, 31),
         )
         # Verify request was made with date range params
         assert len(responses.calls) == 1
         url = responses.calls[0].request.url
-        assert "td=7" in url  # custom range mode
+        # scrape_ticker() uses filing-date params (fd/fdr) for custom range mode
+        assert "fd=-1" in url
+        assert "fdr=" in url
         assert "06%2F01%2F2025" in url or "06/01/2025" in url
         assert len(trades) >= 1
 
@@ -118,7 +125,8 @@ class TestScrapeOpeninsider:
             status=200,
         )
         trades = scrape_latest(
-            count=50, use_cache=False,
+            count=50,
+            use_cache=False,
             start_date=date(2025, 1, 1),
         )
         assert len(trades) >= 1

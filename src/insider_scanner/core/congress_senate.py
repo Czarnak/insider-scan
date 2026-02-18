@@ -42,8 +42,8 @@ _MIN_REQUEST_INTERVAL = 1.0  # seconds between requests
 _last_request_time: float = 0.0
 
 # Regex for extracting PTR UUID links from search results
-_PTR_LINK_RE = re.compile(r'/search/view/ptr/([a-f0-9-]+)/')
-_PAPER_LINK_RE = re.compile(r'/search/view/paper/')
+_PTR_LINK_RE = re.compile(r"/search/view/ptr/([a-f0-9-]+)/")
+_PAPER_LINK_RE = re.compile(r"/search/view/paper/")
 
 # Regex to extract ticker from asset descriptions
 _TICKER_RE = re.compile(r"\(([A-Z]{1,5})\)")
@@ -72,6 +72,7 @@ def _rate_limit() -> None:
 # Session management
 # -----------------------------------------------------------------------
 
+
 class EFDSession:
     """Manages an authenticated session with efdsearch.senate.gov.
 
@@ -81,10 +82,12 @@ class EFDSession:
 
     def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "InsiderScanner/0.1 (research tool)",
-            "Origin": BASE_URL,
-        })
+        self.session.headers.update(
+            {
+                "User-Agent": "InsiderScanner/0.1 (research tool)",
+                "Origin": BASE_URL,
+            }
+        )
         self._authenticated = False
 
     @property
@@ -112,18 +115,18 @@ class EFDSession:
         soup = BeautifulSoup(resp.text, "html.parser")
         csrf_input = soup.find("input", {"name": "csrfmiddlewaretoken"})
         if not csrf_input:
-            raise ConnectionError(
-                "Could not find CSRF token on EFD landing page"
-            )
+            raise ConnectionError("Could not find CSRF token on EFD landing page")
         csrf_token = csrf_input["value"]
 
         _rate_limit()
 
         # Step 2: POST the prohibition agreement
         log.info("Accepting EFD prohibition agreement...")
-        self.session.headers.update({
-            "Referer": SEARCH_HOME,
-        })
+        self.session.headers.update(
+            {
+                "Referer": SEARCH_HOME,
+            }
+        )
         resp = self.session.post(
             SEARCH_HOME,
             data={
@@ -138,25 +141,27 @@ class EFDSession:
         cookies = self.session.cookies.get_dict()
         csrf_cookie = cookies.get("csrftoken", "")
         if csrf_cookie:
-            self.session.headers.update({
-                "X-CSRFToken": csrf_cookie,
-                "Referer": SEARCH_LANDING,
-            })
+            self.session.headers.update(
+                {
+                    "X-CSRFToken": csrf_cookie,
+                    "Referer": SEARCH_LANDING,
+                }
+            )
 
         self._authenticated = True
         log.info("EFD session authenticated successfully")
 
     def search(
-            self,
-            *,
-            first_name: str = "",
-            last_name: str = "",
-            report_types: list[int] | None = None,
-            filter_types: list[int] | None = None,
-            date_from: date | None = None,
-            date_to: date | None = None,
-            start: int = 0,
-            length: int = 100,
+        self,
+        *,
+        first_name: str = "",
+        last_name: str = "",
+        report_types: list[int] | None = None,
+        filter_types: list[int] | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        start: int = 0,
+        length: int = 100,
     ) -> dict:
         """Search the EFD report data API.
 
@@ -187,7 +192,9 @@ class EFDSession:
             On request failure.
         """
         if not self._authenticated:
-            raise ConnectionError("EFD session not authenticated. Call authenticate() first.")
+            raise ConnectionError(
+                "EFD session not authenticated. Call authenticate() first."
+            )
 
         if report_types is None:
             report_types = [REPORT_TYPE_PTR]
@@ -207,17 +214,17 @@ class EFDSession:
             form_data["last_name"] = last_name
         if date_from:
             form_data["submitted_start_date"] = (
-                    date_from.strftime("%m/%d/%Y") + " 00:00:00"
+                date_from.strftime("%m/%d/%Y") + " 00:00:00"
             )
         if date_to:
-            form_data["submitted_end_date"] = (
-                    date_to.strftime("%m/%d/%Y") + " 00:00:00"
-            )
+            form_data["submitted_end_date"] = date_to.strftime("%m/%d/%Y") + " 00:00:00"
 
         _rate_limit()
         log.info(
             "Searching EFD: last=%s first=%s types=%s",
-            last_name, first_name, report_types,
+            last_name,
+            first_name,
+            report_types,
         )
 
         resp = self.session.post(REPORT_DATA, data=form_data, timeout=30)
@@ -256,6 +263,7 @@ def create_efd_session() -> EFDSession:
 # -----------------------------------------------------------------------
 # Search result parsing
 # -----------------------------------------------------------------------
+
 
 def parse_search_results(data: dict) -> list[dict]:
     """Parse the JSON response from the EFD search API.
@@ -301,16 +309,18 @@ def parse_search_results(data: dict) -> list[dict]:
             except ValueError:
                 log.debug("Unparseable date: %s", date_str)
 
-        results.append({
-            "first_name": first_name,
-            "last_name": last_name,
-            "filer_type": filer_type,
-            "report_title": title,
-            "report_url": href,
-            "report_uuid": report_uuid,
-            "filing_date": filing_date,
-            "is_paper": is_paper,
-        })
+        results.append(
+            {
+                "first_name": first_name,
+                "last_name": last_name,
+                "filer_type": filer_type,
+                "report_title": title,
+                "report_url": href,
+                "report_uuid": report_uuid,
+                "filing_date": filing_date,
+                "is_paper": is_paper,
+            }
+        )
 
     return results
 
@@ -318,6 +328,7 @@ def parse_search_results(data: dict) -> list[dict]:
 # -----------------------------------------------------------------------
 # PTR page parsing
 # -----------------------------------------------------------------------
+
 
 def parse_ptr_page(html: str) -> list[dict]:
     """Extract transactions from a Senate PTR HTML page.
@@ -372,7 +383,9 @@ def _find_transaction_table(soup: BeautifulSoup):
     # Look for tables that have transaction-related headers
     for table in soup.find_all("table"):
         text = table.get_text(separator=" ").lower()
-        if "asset" in text and ("transaction" in text or "amount" in text or "type" in text):
+        if "asset" in text and (
+            "transaction" in text or "amount" in text or "type" in text
+        ):
             return table
 
     # Fallback: look in table-responsive div
@@ -440,6 +453,7 @@ def _parse_senate_row(cells: list, col_map: dict[str, int]) -> dict | None:
 # Helper functions
 # -----------------------------------------------------------------------
 
+
 def _split_name(full_name: str) -> tuple[str, str]:
     """Split an official name into (first_name, last_name) for search.
 
@@ -496,13 +510,14 @@ def _parse_date(text: str) -> date | None:
 # Full pipeline
 # -----------------------------------------------------------------------
 
+
 def search_senate_filings(
-        session: EFDSession,
-        *,
-        first_name: str = "",
-        last_name: str = "",
-        date_from: date | None = None,
-        date_to: date | None = None,
+    session: EFDSession,
+    *,
+    first_name: str = "",
+    last_name: str = "",
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> list[dict]:
     """Search for Senate PTR filings and return parsed results.
 
@@ -552,14 +567,14 @@ def search_senate_filings(
 
 
 def scrape_senate_trades(
-        *,
-        official_name: str | None = None,
-        first_name: str = "",
-        last_name: str = "",
-        date_from: date | None = None,
-        date_to: date | None = None,
-        session: EFDSession | None = None,
-        progress_callback: callable | None = None,
+    *,
+    official_name: str | None = None,
+    first_name: str = "",
+    last_name: str = "",
+    date_from: date | None = None,
+    date_to: date | None = None,
+    session: EFDSession | None = None,
+    progress_callback: callable | None = None,
 ) -> list[CongressTrade]:
     """Scrape Senate PTR filings and return CongressTrade records.
 
@@ -622,9 +637,7 @@ def scrape_senate_trades(
             html = session.fetch_page(ptr_url)
             raw_transactions = parse_ptr_page(html)
         except Exception as exc:
-            log.warning(
-                "Failed to fetch/parse PTR %s: %s", ptr_url, exc
-            )
+            log.warning("Failed to fetch/parse PTR %s: %s", ptr_url, exc)
             continue
 
         source_url = BASE_URL + ptr_url if not ptr_url.startswith("http") else ptr_url
@@ -661,6 +674,7 @@ def scrape_senate_trades(
 
     log.info(
         "Scraped %d trades from %d Senate PTR filings",
-        len(all_trades), total,
+        len(all_trades),
+        total,
     )
     return all_trades

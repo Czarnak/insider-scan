@@ -9,11 +9,9 @@ from __future__ import annotations
 
 import json
 from datetime import date
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
-import pytest
 
 from insider_scanner.core.models import CongressTrade
 from insider_scanner.gui.congress_tab import (
@@ -27,6 +25,7 @@ from insider_scanner.gui.congress_tab import (
 # -----------------------------------------------------------------------
 # Shared fixtures
 # -----------------------------------------------------------------------
+
 
 def _house_trades() -> list[CongressTrade]:
     """Simulated House scraper output."""
@@ -141,6 +140,7 @@ MEMBER_SECTORS = {
 # Combined pipeline
 # -----------------------------------------------------------------------
 
+
 class TestCombinedPipeline:
     """Test House + Senate trades merged into one list."""
 
@@ -163,6 +163,7 @@ class TestCombinedPipeline:
 # Filter pipeline
 # -----------------------------------------------------------------------
 
+
 class TestFilterPipeline:
     """Test filtering across mixed House + Senate trades."""
 
@@ -171,21 +172,24 @@ class TestFilterPipeline:
 
     def test_filter_purchases_only(self):
         result = filter_congress_trades(
-            self.all_trades, trade_type="Purchase",
+            self.all_trades,
+            trade_type="Purchase",
         )
         assert len(result) == 3
         assert all(t.trade_type == "Purchase" for t in result)
 
     def test_filter_sales_only(self):
         result = filter_congress_trades(
-            self.all_trades, trade_type="Sale",
+            self.all_trades,
+            trade_type="Sale",
         )
         assert len(result) == 2
         assert all(t.trade_type == "Sale" for t in result)
 
     def test_filter_high_value(self):
         result = filter_congress_trades(
-            self.all_trades, min_value=50000.0,
+            self.all_trades,
+            min_value=50000.0,
         )
         # Pelosi NVDA ($1M+), Tuberville LMT ($50K+), Tuberville MSFT ($100K+)
         assert len(result) == 3
@@ -244,6 +248,7 @@ class TestFilterPipeline:
 # DataFrame conversion
 # -----------------------------------------------------------------------
 
+
 class TestDataframePipeline:
     """Test DataFrame conversion with mixed data."""
 
@@ -274,7 +279,8 @@ class TestDataframePipeline:
         """Filter → DataFrame pipeline."""
         all_trades = _house_trades() + _senate_trades()
         filtered = filter_congress_trades(
-            all_trades, trade_type="Purchase",
+            all_trades,
+            trade_type="Purchase",
         )
         df = congress_trades_to_dataframe(filtered)
         assert len(df) == 3
@@ -285,16 +291,21 @@ class TestDataframePipeline:
 # Save + reload round-trip
 # -----------------------------------------------------------------------
 
+
 class TestSaveReloadPipeline:
     """Test save → reload round-trip preserves data."""
 
     def test_csv_round_trip(self, tmp_path):
         all_trades = _house_trades() + _senate_trades()
 
-        with patch(
-            "insider_scanner.utils.config.SCAN_OUTPUTS_DIR", new=tmp_path,
-        ), patch(
-            "insider_scanner.utils.config.ensure_dirs",
+        with (
+            patch(
+                "insider_scanner.utils.config.SCAN_OUTPUTS_DIR",
+                new=tmp_path,
+            ),
+            patch(
+                "insider_scanner.utils.config.ensure_dirs",
+            ),
         ):
             save_congress_results(all_trades, label="integration_test")
 
@@ -309,10 +320,14 @@ class TestSaveReloadPipeline:
     def test_json_round_trip(self, tmp_path):
         all_trades = _house_trades() + _senate_trades()
 
-        with patch(
-            "insider_scanner.utils.config.SCAN_OUTPUTS_DIR", new=tmp_path,
-        ), patch(
-            "insider_scanner.utils.config.ensure_dirs",
+        with (
+            patch(
+                "insider_scanner.utils.config.SCAN_OUTPUTS_DIR",
+                new=tmp_path,
+            ),
+            patch(
+                "insider_scanner.utils.config.ensure_dirs",
+            ),
         ):
             save_congress_results(all_trades, label="integration_test")
 
@@ -333,13 +348,18 @@ class TestSaveReloadPipeline:
         """Filter → save only filtered results."""
         all_trades = _house_trades() + _senate_trades()
         filtered = filter_congress_trades(
-            all_trades, trade_type="Sale",
+            all_trades,
+            trade_type="Sale",
         )
 
-        with patch(
-            "insider_scanner.utils.config.SCAN_OUTPUTS_DIR", new=tmp_path,
-        ), patch(
-            "insider_scanner.utils.config.ensure_dirs",
+        with (
+            patch(
+                "insider_scanner.utils.config.SCAN_OUTPUTS_DIR",
+                new=tmp_path,
+            ),
+            patch(
+                "insider_scanner.utils.config.ensure_dirs",
+            ),
         ):
             save_congress_results(filtered, label="sales_only")
 
@@ -352,6 +372,7 @@ class TestSaveReloadPipeline:
 # Scraper mock integration
 # -----------------------------------------------------------------------
 
+
 class TestScraperIntegration:
     """Test that the congress_tab scan flow calls scrapers correctly."""
 
@@ -362,6 +383,7 @@ class TestScraperIntegration:
             return_value=_house_trades(),
         ) as mock_house:
             from insider_scanner.core.congress_house import scrape_house_trades
+
             trades = scrape_house_trades(
                 official_name="Pelosi Nancy",
                 date_from=date(2025, 1, 1),
@@ -379,6 +401,7 @@ class TestScraperIntegration:
             return_value=_senate_trades(),
         ) as mock_senate:
             from insider_scanner.core.congress_senate import scrape_senate_trades
+
             trades = scrape_senate_trades(
                 official_name="Tuberville Tommy",
                 date_from=date(2025, 1, 1),
@@ -391,12 +414,15 @@ class TestScraperIntegration:
 
     def test_combined_scan(self):
         """Simulate the full House + Senate scan → filter → save flow."""
-        with patch(
-            "insider_scanner.core.congress_house.scrape_house_trades",
-            return_value=_house_trades(),
-        ), patch(
-            "insider_scanner.core.congress_senate.scrape_senate_trades",
-            return_value=_senate_trades(),
+        with (
+            patch(
+                "insider_scanner.core.congress_house.scrape_house_trades",
+                return_value=_house_trades(),
+            ),
+            patch(
+                "insider_scanner.core.congress_senate.scrape_senate_trades",
+                return_value=_senate_trades(),
+            ),
         ):
             from insider_scanner.core.congress_house import scrape_house_trades
             from insider_scanner.core.congress_senate import scrape_senate_trades
@@ -409,7 +435,8 @@ class TestScraperIntegration:
 
         # Filter
         purchases = filter_congress_trades(
-            all_trades, trade_type="Purchase",
+            all_trades,
+            trade_type="Purchase",
         )
         assert len(purchases) == 3
 
@@ -425,6 +452,7 @@ class TestScraperIntegration:
             return_value=_house_trades(),
         ) as mock_house:
             from insider_scanner.core.congress_house import scrape_house_trades
+
             trades = scrape_house_trades(official_name=None)
 
         assert len(trades) == 3

@@ -18,11 +18,13 @@ from insider_scanner.core.models import InsiderTrade
 from tests.fixtures import EDGAR_CIK_HTML, EDGAR_CIK_NOT_FOUND_HTML
 
 # Sample company_tickers.json payload (SEC format)
-COMPANY_TICKERS_JSON = json.dumps({
-    "0": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."},
-    "1": {"cik_str": 789019, "ticker": "MSFT", "title": "Microsoft Corp"},
-    "2": {"cik_str": 1318605, "ticker": "TSLA", "title": "Tesla, Inc."},
-})
+COMPANY_TICKERS_JSON = json.dumps(
+    {
+        "0": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."},
+        "1": {"cik_str": 789019, "ticker": "MSFT", "title": "Microsoft Corp"},
+        "2": {"cik_str": 1318605, "ticker": "TSLA", "title": "Tesla, Inc."},
+    }
+)
 
 
 class TestParseCik:
@@ -42,19 +44,25 @@ class TestParseCik:
 class TestResolveCikFromJson:
     @responses.activate
     def test_resolve_aapl(self):
-        responses.add(responses.GET, COMPANY_TICKERS_URL, body=COMPANY_TICKERS_JSON, status=200)
+        responses.add(
+            responses.GET, COMPANY_TICKERS_URL, body=COMPANY_TICKERS_JSON, status=200
+        )
         cik = resolve_cik_from_json("AAPL", use_cache=False)
         assert cik == "320193"
 
     @responses.activate
     def test_resolve_case_insensitive(self):
-        responses.add(responses.GET, COMPANY_TICKERS_URL, body=COMPANY_TICKERS_JSON, status=200)
+        responses.add(
+            responses.GET, COMPANY_TICKERS_URL, body=COMPANY_TICKERS_JSON, status=200
+        )
         cik = resolve_cik_from_json("aapl", use_cache=False)
         assert cik == "320193"
 
     @responses.activate
     def test_resolve_not_found(self):
-        responses.add(responses.GET, COMPANY_TICKERS_URL, body=COMPANY_TICKERS_JSON, status=200)
+        responses.add(
+            responses.GET, COMPANY_TICKERS_URL, body=COMPANY_TICKERS_JSON, status=200
+        )
         cik = resolve_cik_from_json("ZZZZ", use_cache=False)
         assert cik is None
 
@@ -66,7 +74,9 @@ class TestResolveCikFromJson:
 
     @responses.activate
     def test_resolve_tsla(self):
-        responses.add(responses.GET, COMPANY_TICKERS_URL, body=COMPANY_TICKERS_JSON, status=200)
+        responses.add(
+            responses.GET, COMPANY_TICKERS_URL, body=COMPANY_TICKERS_JSON, status=200
+        )
         cik = resolve_cik_from_json("TSLA", use_cache=False)
         assert cik == "1318605"
 
@@ -77,7 +87,9 @@ class TestResolveCik:
     @responses.activate
     def test_json_primary_success(self):
         """JSON resolves → returns zero-padded CIK, no HTML request made."""
-        responses.add(responses.GET, COMPANY_TICKERS_URL, body=COMPANY_TICKERS_JSON, status=200)
+        responses.add(
+            responses.GET, COMPANY_TICKERS_URL, body=COMPANY_TICKERS_JSON, status=200
+        )
         cik = resolve_cik("AAPL", use_cache=False)
         assert cik == "0000320193"
         # Only 1 request (JSON), no HTML fallback
@@ -87,7 +99,9 @@ class TestResolveCik:
     @responses.activate
     def test_json_miss_html_fallback(self):
         """JSON returns None → falls back to HTML scraping."""
-        responses.add(responses.GET, COMPANY_TICKERS_URL, body=COMPANY_TICKERS_JSON, status=200)
+        responses.add(
+            responses.GET, COMPANY_TICKERS_URL, body=COMPANY_TICKERS_JSON, status=200
+        )
         responses.add(
             responses.GET,
             "https://www.sec.gov/cgi-bin/browse-edgar",
@@ -123,6 +137,7 @@ class TestFilingUrl:
 class TestBuildEdgarUrl:
     def test_build_url(self):
         from datetime import date
+
         trade = InsiderTrade(
             ticker="AAPL",
             insider_name="Cook Timothy",

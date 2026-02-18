@@ -42,10 +42,10 @@ class DashboardTab(QWidget):
     """Live-updating dashboard with prices, VIX chart, F&G, and indicators."""
 
     def __init__(
-            self,
-            provider: MarketDataProvider,
-            indicator_specs: List[IndicatorSpec],
-            parent=None,
+        self,
+        provider: MarketDataProvider,
+        indicator_specs: List[IndicatorSpec],
+        parent=None,
     ):
         super().__init__(parent)
         self.provider = provider
@@ -88,7 +88,9 @@ class DashboardTab(QWidget):
         self.vix_plot.showGrid(x=True, y=True, alpha=0.35)
         self.vix_plot.setMinimumHeight(220)
         self.vix_plot.setTitle(
-            "VIX (last ~30 days)", color="w", size="11pt",
+            "VIX (last ~30 days)",
+            color="w",
+            size="11pt",
         )
 
         for axis_name in ("left", "bottom"):
@@ -206,7 +208,9 @@ class DashboardTab(QWidget):
     def _on_error(self, exc_info: tuple):
         exc_type, exc_value, _ = exc_info
         log.warning(
-            "Dashboard refresh failed: %s: %s", exc_type.__name__, exc_value,
+            "Dashboard refresh failed: %s: %s",
+            exc_type.__name__,
+            exc_value,
         )
         # Set all cards to n/a
         for card in self.top_cards.values():
@@ -216,7 +220,9 @@ class DashboardTab(QWidget):
             card.set_value("n/a", "data unavailable", self._NA_BG)
         for spec in self.indicator_specs:
             self.ind_cards[spec.key].set_value(
-                "n/a", "data unavailable", self._NA_BG,
+                "n/a",
+                "data unavailable",
+                self._NA_BG,
             )
 
     # ------------------------------------------------------------------
@@ -249,7 +255,8 @@ class DashboardTab(QWidget):
         except (TypeError, AttributeError):
             # Fallback for unusual index types
             x = np.array(
-                [ts.timestamp() for ts in s.index], dtype=np.float64,
+                [ts.timestamp() for ts in s.index],
+                dtype=np.float64,
             )
         y = s.to_numpy(dtype=np.float64)
 

@@ -47,6 +47,7 @@ class PandasTableModel(QAbstractTableModel):
             if "is_congress" in self._df.columns:
                 if self._df.iloc[index.row()]["is_congress"]:
                     from PySide6.QtGui import QColor
+
                     return QColor(200, 50, 50)
         return None
 
@@ -83,6 +84,7 @@ class SortableTableModel(QSortFilterProxyModel):
 # Dashboard card widgets
 # -------------------------------------------------------------------
 
+
 class PriceChangeCard(QtWidgets.QFrame):
     """Card showing a price and 1-day % change with colored background."""
 
@@ -117,10 +119,10 @@ class PriceChangeCard(QtWidgets.QFrame):
         lay.addStretch(1)
 
     def set_value(
-            self,
-            price_usd: Optional[float],
-            pct_change: Optional[float],
-            bg_rgba: Tuple[int, int, int, int] = (40, 40, 40, 120),
+        self,
+        price_usd: Optional[float],
+        pct_change: Optional[float],
+        bg_rgba: Tuple[int, int, int, int] = (40, 40, 40, 120),
     ):
         if price_usd is None:
             self.price_lbl.setText("n/a")
@@ -134,14 +136,17 @@ class PriceChangeCard(QtWidgets.QFrame):
             self.chg_lbl.setText(f"Δ1D: {sign}{pct_change:.2f}%")
 
         r, g, b, a = bg_rgba
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             QFrame#PriceChangeCard {
                 border: 1px solid rgba(128,128,128,80);
                 border-radius: 10px;
                 padding: 10px;
                 background-color: rgba(%d,%d,%d,%d);
             }
-        """ % (r, g, b, a))
+        """
+            % (r, g, b, a)
+        )
 
 
 class ValueCard(QtWidgets.QFrame):
@@ -176,27 +181,31 @@ class ValueCard(QtWidgets.QFrame):
         lay.addStretch(1)
 
     def set_value(
-            self,
-            value_text: str,
-            meta_text: str = "",
-            bg_rgba: Tuple[int, int, int, int] = (40, 40, 40, 120),
+        self,
+        value_text: str,
+        meta_text: str = "",
+        bg_rgba: Tuple[int, int, int, int] = (40, 40, 40, 120),
     ):
         self.value_lbl.setText(value_text)
         self.meta_lbl.setText(meta_text)
         r, g, b, a = bg_rgba
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             QFrame#ValueCard {
                 border: 1px solid rgba(128,128,128,80);
                 border-radius: 10px;
                 padding: 10px;
                 background-color: rgba(%d,%d,%d,%d);
             }
-        """ % (r, g, b, a))
+        """
+            % (r, g, b, a)
+        )
 
 
 # -------------------------------------------------------------------
 # Color helpers for dashboard
 # -------------------------------------------------------------------
+
 
 def fg_color(value: int) -> Tuple[int, int, int, int]:
     """Map a 0–100 Fear & Greed score to an RGBA background color."""
@@ -210,8 +219,8 @@ def fg_color(value: int) -> Tuple[int, int, int, int]:
 
 
 def indicator_color(
-        value: float,
-        bands: Tuple[Tuple[float, float, str], ...],
+    value: float,
+    bands: Tuple[Tuple[float, float, str], ...],
 ) -> Tuple[int, int, int, int]:
     """Map a numeric value to an RGBA color using band definitions."""
     palette = {

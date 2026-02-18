@@ -18,12 +18,24 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 
-import numpy as np
 import pandas as pd
 import requests
-import yfinance as yf
+try:
+    import yfinance as yf
+except ImportError:
+    class _YFinanceStub:
+        """Fallback object so tests can patch yf.download even if yfinance isn't installed."""
 
-import fear_and_greed
+        @staticmethod
+        def download(*args, **kwargs):
+            raise ImportError("yfinance is not installed")
+
+    yf = _YFinanceStub()
+
+try:
+    import fear_and_greed
+except ImportError:
+    fear_and_greed = None
 
 from insider_scanner.core.bgeometrics_client import BGeometricsClient
 
@@ -36,6 +48,7 @@ PRICE_SYMBOLS: List[str] = ["GC=F", "SI=F", "CL=F", "ES=F", "NQ=F"]
 # -------------------------------------------------------------------
 # Helpers
 # -------------------------------------------------------------------
+
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -76,6 +89,7 @@ def _extract_close(df: pd.DataFrame, symbol: str) -> pd.Series:
 # Bitcoin indicator math
 # -------------------------------------------------------------------
 
+
 def calculate_rsi(close: pd.Series, period: int = 14) -> Optional[float]:
     """Calculate the latest RSI value from a close-price series.
 
@@ -106,6 +120,7 @@ def calculate_rsi(close: pd.Series, period: int = 14) -> Optional[float]:
 # In-memory TTL cache
 # -------------------------------------------------------------------
 
+
 @dataclass
 class CacheEntry:
     value: Any
@@ -126,7 +141,8 @@ class TTLCache:
 
     def set(self, key: str, value: Any, ttl: timedelta) -> None:
         self._store[key] = CacheEntry(
-            value=value, expires_at=_utcnow() + ttl,
+            value=value,
+            expires_at=_utcnow() + ttl,
         )
 
     def clear(self) -> None:
@@ -136,6 +152,7 @@ class TTLCache:
 # -------------------------------------------------------------------
 # Fear & Greed classification
 # -------------------------------------------------------------------
+
 
 def classify_fng(v: int) -> str:
     """Classify a 0–100 Fear & Greed score into a label."""
@@ -151,6 +168,7 @@ def classify_fng(v: int) -> str:
 # -------------------------------------------------------------------
 # Fear & Greed clients
 # -------------------------------------------------------------------
+
 
 class StockFearGreedClient:
     """CNN Fear & Greed Index via the ``fear_and_greed`` library."""
@@ -172,6 +190,9 @@ class StockFearGreedClient:
             return cached
 
         latest: Optional[Tuple[int, str]] = None
+        if fear_and_greed is None:
+            self.cache.set(cache_key, latest, self.ttl)
+            return latest
         try:
             score = int(fear_and_greed.get().value)
             latest = (score, classify_fng(score))
@@ -249,8 +270,7 @@ class CryptoFearGreedClient:
             if isinstance(item, dict):
                 score = int(item.get("value"))
                 label = str(
-                    item.get("value_classification")
-                    or classify_fng(score),
+                    item.get("value_classification") or classify_fng(score),
                 )
                 latest = (score, label)
         except Exception:
@@ -263,6 +283,7 @@ class CryptoFearGreedClient:
 # -------------------------------------------------------------------
 # CBBI client (Colin Talks Crypto Bitcoin Bull Run Index)
 # -------------------------------------------------------------------
+
 
 class CBBIClient:
     """Fetch the latest CBBI confidence score.
@@ -306,8 +327,12 @@ class CBBIClient:
                     # Date-keyed: {"2025-01-15": 0.42, ...}
                     latest_key = max(data.keys())
                     raw = data[latest_key]
-                    v = float(raw) if not isinstance(raw, dict) else float(
-                        raw.get("Confidence", raw.get("confidence", 0)),
+                    v = (
+                        float(raw)
+                        if not isinstance(raw, dict)
+                        else float(
+                            raw.get("Confidence", raw.get("confidence", 0)),
+                        )
                     )
                     # Normalize: if value is 0–1, scale to 0–100
                     value = round(v * 100, 1) if v <= 1.0 else round(v, 1)
@@ -322,6 +347,7 @@ class CBBIClient:
 # -------------------------------------------------------------------
 # Concrete provider
 # -------------------------------------------------------------------
+
 
 class MarketProvider:
     """Fetch prices (yfinance), VIX, Fear & Greed, and BTC indicators.
@@ -345,7 +371,9 @@ class MarketProvider:
     # -- yfinance wrappers (NOT thread-safe — call sequentially) ------
 
     def get_daily_close(
-        self, symbol: str, lookback_days: int,
+        self,
+        symbol: str,
+        lookback_days: int,
     ) -> pd.Series:
         cache_key = f"daily_close:{symbol}:{lookback_days}"
         cached = self._cache.get(cache_key)
@@ -493,9 +521,11 @@ class MarketProvider:
 # Data transfer objects
 # -------------------------------------------------------------------
 
+
 @dataclass
 class DashboardSnapshot:
     """All data needed for one dashboard refresh cycle."""
+
     prices: Dict[str, pd.Series] = field(default_factory=dict)
     vix: pd.Series = field(default_factory=lambda: pd.Series(dtype=float))
     fear_greed: Dict[str, Optional[Tuple[int, str]]] = field(
@@ -508,14 +538,17 @@ class DashboardSnapshot:
 # Protocol + spec (for type-checking and DI)
 # -------------------------------------------------------------------
 
+
 class MarketDataProvider(Protocol):
     def fetch_all(self) -> DashboardSnapshot: ...
+
     latest_indicator_values: Dict[str, float]
 
 
 @dataclass(frozen=True)
 class IndicatorSpec:
     """Describes an indicator tile: key, title, optional unit, color bands."""
+
     key: str
     title: str
     unit: str = ""
@@ -525,33 +558,49 @@ class IndicatorSpec:
 # Default indicator specifications (used by MainWindow)
 DEFAULT_INDICATOR_SPECS: List[IndicatorSpec] = [
     IndicatorSpec(
-        key="mvrv_z", title="MVRV Z-Score",
-        bands=((-10, 0, "green"), (0, 3, "yellow"),
-               (3, 7, "orange"), (7, 1e9, "red")),
+        key="mvrv_z",
+        title="MVRV Z-Score",
+        bands=((-10, 0, "green"), (0, 3, "yellow"), (3, 7, "orange"), (7, 1e9, "red")),
     ),
     IndicatorSpec(
-        key="nupl", title="NUPL",
-        bands=((-1, 0, "green"), (0, 0.25, "yellow"),
-               (0.25, 0.5, "orange"), (0.5, 1.1, "red")),
+        key="nupl",
+        title="NUPL",
+        bands=(
+            (-1, 0, "green"),
+            (0, 0.25, "yellow"),
+            (0.25, 0.5, "orange"),
+            (0.5, 1.1, "red"),
+        ),
     ),
     IndicatorSpec(
-        key="rsi", title="RSI",
-        bands=((0, 30, "green"), (30, 40, "yellow"),
-               (40, 70, "orange"), (70, 101, "red")),
+        key="rsi",
+        title="RSI",
+        bands=(
+            (0, 30, "green"),
+            (30, 40, "yellow"),
+            (40, 70, "orange"),
+            (70, 101, "red"),
+        ),
     ),
     IndicatorSpec(
-        key="vdd", title="VDD",
-        bands=((0, 1, "green"), (1, 2, "yellow"),
-               (2, 3, "orange"), (3, 1e9, "red")),
+        key="vdd",
+        title="VDD",
+        bands=((0, 1, "green"), (1, 2, "yellow"), (2, 3, "orange"), (3, 1e9, "red")),
     ),
     IndicatorSpec(
-        key="lth_rp_gap", title="Price vs LTH RP", unit="%",
-        bands=((-1000, -5, "green"), (-5, 5, "yellow"),
-               (5, 1000, "orange")),
+        key="lth_rp_gap",
+        title="Price vs LTH RP",
+        unit="%",
+        bands=((-1000, -5, "green"), (-5, 5, "yellow"), (5, 1000, "orange")),
     ),
     IndicatorSpec(
-        key="cbbi", title="CBBI",
-        bands=((0, 16, "green"), (16, 60, "yellow"),
-               (60, 80, "orange"), (80, 101, "red")),
+        key="cbbi",
+        title="CBBI",
+        bands=(
+            (0, 16, "green"),
+            (16, 60, "yellow"),
+            (60, 80, "orange"),
+            (80, 101, "red"),
+        ),
     ),
 ]

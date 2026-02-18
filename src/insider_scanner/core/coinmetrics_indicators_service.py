@@ -8,7 +8,10 @@ from typing import Optional, Dict, Any, Literal
 import numpy as np
 import pandas as pd
 
-from insider_scanner.core.coinmetrics_cached_client import CoinMetricsCachedClient, CoinMetricsCacheConfig
+from insider_scanner.core.coinmetrics_cached_client import (
+    CoinMetricsCachedClient,
+    CoinMetricsCacheConfig,
+)
 from insider_scanner.core.coinmetrics_client import CoinMetricsClient
 
 log = logging.getLogger(__name__)
@@ -24,10 +27,10 @@ def nupl(market_cap: pd.Series, realized_cap: pd.Series) -> pd.Series:
 
 
 def mvrv_z_score(
-        market_cap: pd.Series,
-        realized_cap: pd.Series,
-        sigma_window: int = 365,
-        sigma_method: Literal["rolling", "expanding"] = "rolling",
+    market_cap: pd.Series,
+    realized_cap: pd.Series,
+    sigma_window: int = 365,
+    sigma_method: Literal["rolling", "expanding"] = "rolling",
 ) -> pd.Series:
     mc, rc = market_cap.align(realized_cap, join="inner")
     if sigma_method == "rolling":
@@ -65,11 +68,11 @@ class CoinMetricsIndicatorsService:
 
     # ---- Raw data getters
     def get_caps(
-            self,
-            asset: str = "btc",
-            start_time: Optional[str] = None,
-            end_time: Optional[str] = None,
-            force_refresh: bool = False,
+        self,
+        asset: str = "btc",
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        force_refresh: bool = False,
     ) -> pd.DataFrame:
         """
         Market cap + realized cap for MVRV/NUPL.
@@ -90,7 +93,10 @@ class CoinMetricsIndicatorsService:
                     missing,
                 )
                 df = self._fetch_caps_raw(
-                    asset, start_time, end_time, force_refresh=True,
+                    asset,
+                    start_time,
+                    end_time,
+                    force_refresh=True,
                 )
 
         if df.empty:
@@ -104,7 +110,8 @@ class CoinMetricsIndicatorsService:
                 "CoinMetrics API did not return columns: %s. "
                 "Got: %s. MVRV-Z and NUPL cannot be computed. "
                 "This metric may require a Pro API key.",
-                missing, present,
+                missing,
+                present,
             )
             return pd.DataFrame()
 
@@ -112,11 +119,11 @@ class CoinMetricsIndicatorsService:
         return out.tail(self.cfg.tail_points)
 
     def _fetch_caps_raw(
-            self,
-            asset: str,
-            start_time: Optional[str],
-            end_time: Optional[str],
-            force_refresh: bool,
+        self,
+        asset: str,
+        start_time: Optional[str],
+        end_time: Optional[str],
+        force_refresh: bool,
     ) -> pd.DataFrame:
         """Low-level fetch — returns raw DataFrame from cached client."""
         df = self.cm_cached.get_asset_metrics_df(
@@ -129,48 +136,63 @@ class CoinMetricsIndicatorsService:
         )
         if df is None or df.empty:
             log.warning(
-                "CoinMetrics returned empty data for %s "
-                "(start=%s, refresh=%s)",
-                asset, start_time, force_refresh,
+                "CoinMetrics returned empty data for %s (start=%s, refresh=%s)",
+                asset,
+                start_time,
+                force_refresh,
             )
             return pd.DataFrame()
         return df
 
     # ---- Computations
     def compute_nupl(
-            self, asset: str = "btc", start_time: Optional[str] = None, end_time: Optional[str] = None,
-            force_refresh: bool = False
+        self,
+        asset: str = "btc",
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        force_refresh: bool = False,
     ) -> pd.Series:
         df = self.get_caps(asset, start_time, end_time, force_refresh)
         if df.empty or "CapMrktCurUSD" not in df or "CapRealUSD" not in df:
-            log.debug("NUPL: insufficient data (empty=%s, cols=%s)",
-                      df.empty, list(df.columns) if not df.empty else [])
+            log.debug(
+                "NUPL: insufficient data (empty=%s, cols=%s)",
+                df.empty,
+                list(df.columns) if not df.empty else [],
+            )
             return pd.Series(dtype=float, name="nupl")
         return nupl(df["CapMrktCurUSD"], df["CapRealUSD"])
 
     def compute_mvrv_z(
-            self,
-            asset: str = "btc",
-            start_time: Optional[str] = None,
-            end_time: Optional[str] = None,
-            force_refresh: bool = False,
-            sigma_window: int = 365,
-            sigma_method: Literal["rolling", "expanding"] = "rolling",
+        self,
+        asset: str = "btc",
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        force_refresh: bool = False,
+        sigma_window: int = 365,
+        sigma_method: Literal["rolling", "expanding"] = "rolling",
     ) -> pd.Series:
         df = self.get_caps(asset, start_time, end_time, force_refresh)
         if df.empty or "CapMrktCurUSD" not in df or "CapRealUSD" not in df:
-            log.debug("MVRV-Z: insufficient data (empty=%s, cols=%s)",
-                      df.empty, list(df.columns) if not df.empty else [])
+            log.debug(
+                "MVRV-Z: insufficient data (empty=%s, cols=%s)",
+                df.empty,
+                list(df.columns) if not df.empty else [],
+            )
             return pd.Series(dtype=float, name="mvrv_z_score")
-        return mvrv_z_score(df["CapMrktCurUSD"], df["CapRealUSD"], sigma_window=sigma_window, sigma_method=sigma_method)
+        return mvrv_z_score(
+            df["CapMrktCurUSD"],
+            df["CapRealUSD"],
+            sigma_window=sigma_window,
+            sigma_method=sigma_method,
+        )
 
     # ---- Dashboard API
     def get_dashboard_snapshot(
-            self,
-            asset: str = "btc",
-            start_time: Optional[str] = "2016-01-01",
-            end_time: Optional[str] = None,
-            force_refresh: bool = False,
+        self,
+        asset: str = "btc",
+        start_time: Optional[str] = "2016-01-01",
+        end_time: Optional[str] = None,
+        force_refresh: bool = False,
     ) -> Dict[str, Any]:
         """
         Returns dict ready to plug into Dashboard tiles.

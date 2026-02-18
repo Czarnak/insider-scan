@@ -34,17 +34,17 @@ class CoinMetricsCachedClient:
         self.cfg.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def get_asset_metrics_df(
-            self,
-            assets: Union[str, Sequence[str]],
-            metrics: Union[str, Sequence[str]],
-            frequency: str = "1d",
-            start_time: Optional[str] = None,
-            end_time: Optional[str] = None,
-            page_size: int = 1000,
-            limit_per_asset: Optional[int] = None,
-            sort: Optional[str] = "time",
-            force_refresh: bool = False,
-            **extra_params: Any,
+        self,
+        assets: Union[str, Sequence[str]],
+        metrics: Union[str, Sequence[str]],
+        frequency: str = "1d",
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        page_size: int = 1000,
+        limit_per_asset: Optional[int] = None,
+        sort: Optional[str] = "time",
+        force_refresh: bool = False,
+        **extra_params: Any,
     ) -> pd.DataFrame:
         """
         Cached equivalent of CoinMetricsClient.get_asset_metrics(...),
@@ -107,7 +107,9 @@ class CoinMetricsCachedClient:
 
         if "time" in df.columns:
             df["time"] = pd.to_datetime(df["time"], utc=True, errors="coerce")
-            df = df.dropna(subset=["time"]).sort_values(["asset", "time"] if "asset" in df.columns else ["time"])
+            df = df.dropna(subset=["time"]).sort_values(
+                ["asset", "time"] if "asset" in df.columns else ["time"]
+            )
             df = df.set_index("time")
 
         for c in df.columns:
@@ -127,6 +129,8 @@ class CoinMetricsCachedClient:
             out = out.reset_index()
 
         if "time" in out.columns:
-            out["time"] = pd.to_datetime(out["time"], utc=True, errors="coerce").dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+            out["time"] = pd.to_datetime(
+                out["time"], utc=True, errors="coerce"
+            ).dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         return {"data": out.to_dict(orient="records")}

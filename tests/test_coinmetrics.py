@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -27,6 +25,7 @@ from insider_scanner.core.coinmetrics_client import CoinMetricsClient
 # -------------------------------------------------------------------
 # Pure-math indicator functions
 # -------------------------------------------------------------------
+
 
 class TestNupl:
     def test_basic(self):
@@ -81,6 +80,7 @@ class TestMvrvZScore:
 # CoinMetricsIndicatorsService
 # -------------------------------------------------------------------
 
+
 class TestCoinMetricsIndicatorsService:
     @pytest.fixture
     def mock_cm(self):
@@ -97,10 +97,13 @@ class TestCoinMetricsIndicatorsService:
     def _caps_df(self, n=100) -> pd.DataFrame:
         """DataFrame with both required columns."""
         idx = pd.date_range("2024-01-01", periods=n, freq="D", tz="UTC")
-        return pd.DataFrame({
-            "CapMrktCurUSD": np.linspace(100e9, 500e9, n),
-            "CapRealUSD": np.linspace(80e9, 300e9, n),
-        }, index=idx)
+        return pd.DataFrame(
+            {
+                "CapMrktCurUSD": np.linspace(100e9, 500e9, n),
+                "CapRealUSD": np.linspace(80e9, 300e9, n),
+            },
+            index=idx,
+        )
 
     def test_get_caps_returns_both_columns(self, service, mock_cm):
         df = self._caps_df(400)
@@ -111,16 +114,23 @@ class TestCoinMetricsIndicatorsService:
         assert "CapRealUSD" in result.columns
 
     def test_get_caps_missing_realized_cap_logs_warning(
-        self, service, mock_cm, caplog,
+        self,
+        service,
+        mock_cm,
+        caplog,
     ):
         """If API returns only CapMrktCurUSD, log warning & return empty."""
         idx = pd.date_range("2024-01-01", periods=50, freq="D", tz="UTC")
-        partial_df = pd.DataFrame({
-            "CapMrktCurUSD": np.linspace(100e9, 200e9, 50),
-        }, index=idx)
+        partial_df = pd.DataFrame(
+            {
+                "CapMrktCurUSD": np.linspace(100e9, 200e9, 50),
+            },
+            index=idx,
+        )
         mock_cm.get_asset_metrics.return_value = partial_df
 
         import logging
+
         with caplog.at_level(logging.WARNING):
             result = service.get_caps("btc", start_time="2024-01-01")
 
@@ -131,6 +141,7 @@ class TestCoinMetricsIndicatorsService:
         mock_cm.get_asset_metrics.return_value = pd.DataFrame()
 
         import logging
+
         with caplog.at_level(logging.WARNING):
             result = service.get_caps("btc")
 
@@ -158,7 +169,8 @@ class TestCoinMetricsIndicatorsService:
         mock_cm.get_asset_metrics.return_value = df
 
         snap = service.get_dashboard_snapshot(
-            asset="btc", start_time="2024-01-01",
+            asset="btc",
+            start_time="2024-01-01",
         )
         assert snap["mvrv_z"]["latest"] is not None
         assert snap["nupl"]["latest"] is not None
@@ -174,6 +186,7 @@ class TestCoinMetricsIndicatorsService:
 # -------------------------------------------------------------------
 # CoinMetricsCachedClient — cache poisoning prevention
 # -------------------------------------------------------------------
+
 
 class TestCachedClientCachePoisoning:
     @pytest.fixture
@@ -193,7 +206,8 @@ class TestCachedClientCachePoisoning:
         mock_cm.get_asset_metrics.return_value = pd.DataFrame()
 
         result = cached_client.get_asset_metrics_df(
-            assets="btc", metrics="CapMrktCurUSD",
+            assets="btc",
+            metrics="CapMrktCurUSD",
         )
         assert result.empty
 
@@ -203,7 +217,8 @@ class TestCachedClientCachePoisoning:
             index=pd.DatetimeIndex(["2025-01-01"], name="time"),
         )
         result2 = cached_client.get_asset_metrics_df(
-            assets="btc", metrics="CapMrktCurUSD",
+            assets="btc",
+            metrics="CapMrktCurUSD",
         )
         assert not result2.empty
         assert mock_cm.get_asset_metrics.call_count == 2
@@ -218,10 +233,12 @@ class TestCachedClientCachePoisoning:
         mock_cm.get_asset_metrics.return_value = df
 
         cached_client.get_asset_metrics_df(
-            assets="btc", metrics="CapMrktCurUSD",
+            assets="btc",
+            metrics="CapMrktCurUSD",
         )
         cached_client.get_asset_metrics_df(
-            assets="btc", metrics="CapMrktCurUSD",
+            assets="btc",
+            metrics="CapMrktCurUSD",
         )
         # Second call should hit cache, not API
         assert mock_cm.get_asset_metrics.call_count == 1
@@ -231,6 +248,7 @@ class TestCachedClientCachePoisoning:
 # CoinMetricsClient — 403 fail-fast
 # -------------------------------------------------------------------
 
+
 class TestCoinMetricsClient403:
     def test_403_fails_immediately_no_retries(self):
         """403 Forbidden should raise immediately, not retry 5 times."""
@@ -238,7 +256,6 @@ class TestCoinMetricsClient403:
             CoinMetricsClient,
             CoinMetricsClientConfig,
         )
-        from unittest.mock import patch
 
         mock_response = MagicMock()
         mock_response.status_code = 403
@@ -249,7 +266,9 @@ class TestCoinMetricsClient403:
         cfg = CoinMetricsClientConfig(max_retries=5)
         client = CoinMetricsClient(cfg)
 
-        with patch.object(client.session, "get", return_value=mock_response) as mock_get:
+        with patch.object(
+            client.session, "get", return_value=mock_response
+        ) as mock_get:
             with pytest.raises(requests.HTTPError, match="403"):
                 client._get_json("/test", {})
 

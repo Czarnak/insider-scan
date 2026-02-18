@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from datetime import date
-from pathlib import Path
 from unittest.mock import patch
 
 from insider_scanner.core.models import CongressTrade
@@ -22,6 +21,7 @@ from insider_scanner.gui.congress_tab import (
 # -----------------------------------------------------------------------
 # Fixtures
 # -----------------------------------------------------------------------
+
 
 def _make_trade(**overrides) -> CongressTrade:
     """Create a CongressTrade with sensible defaults, accepting overrides."""
@@ -93,19 +93,28 @@ MEMBER_SECTORS = {
 # SECTORS constant
 # -----------------------------------------------------------------------
 
+
 class TestSectors:
     def test_starts_with_all(self):
         assert SECTORS[0] == "All"
 
     def test_contains_key_sectors(self):
-        for s in ("Defense", "Energy", "Finance", "Technology",
-                  "Healthcare", "Industrials", "Other"):
+        for s in (
+            "Defense",
+            "Energy",
+            "Finance",
+            "Technology",
+            "Healthcare",
+            "Industrials",
+            "Other",
+        ):
             assert s in SECTORS
 
 
 # -----------------------------------------------------------------------
 # _load_congress_names
 # -----------------------------------------------------------------------
+
 
 class TestLoadCongressNames:
     def test_loads_from_file(self, tmp_path):
@@ -134,6 +143,7 @@ class TestLoadCongressNames:
 # _load_member_sectors
 # -----------------------------------------------------------------------
 
+
 class TestLoadMemberSectors:
     def test_loads_sectors(self, tmp_path):
         data = [
@@ -161,6 +171,7 @@ class TestLoadMemberSectors:
 # congress_trades_to_dataframe
 # -----------------------------------------------------------------------
 
+
 class TestCongressTradesToDataframe:
     def test_converts(self):
         df = congress_trades_to_dataframe(SAMPLE_TRADES)
@@ -177,35 +188,28 @@ class TestCongressTradesToDataframe:
 # filter_congress_trades
 # -----------------------------------------------------------------------
 
+
 class TestFilterCongressTrades:
     def test_no_filters(self):
         result = filter_congress_trades(SAMPLE_TRADES)
         assert len(result) == 4
 
     def test_by_trade_type(self):
-        result = filter_congress_trades(
-            SAMPLE_TRADES, trade_type="Purchase"
-        )
+        result = filter_congress_trades(SAMPLE_TRADES, trade_type="Purchase")
         assert len(result) == 2
         assert all(t.trade_type == "Purchase" for t in result)
 
     def test_by_min_value(self):
-        result = filter_congress_trades(
-            SAMPLE_TRADES, min_value=50000.0
-        )
+        result = filter_congress_trades(SAMPLE_TRADES, min_value=50000.0)
         assert len(result) == 2
         assert all(t.amount_low >= 50000 for t in result)
 
     def test_by_date_since(self):
-        result = filter_congress_trades(
-            SAMPLE_TRADES, since=date(2025, 4, 1)
-        )
+        result = filter_congress_trades(SAMPLE_TRADES, since=date(2025, 4, 1))
         assert len(result) == 2
 
     def test_by_date_until(self):
-        result = filter_congress_trades(
-            SAMPLE_TRADES, until=date(2025, 3, 15)
-        )
+        result = filter_congress_trades(SAMPLE_TRADES, until=date(2025, 3, 15))
         assert len(result) == 2
 
     def test_by_date_range(self):
@@ -272,17 +276,19 @@ class TestFilterCongressTrades:
 # save_congress_results
 # -----------------------------------------------------------------------
 
+
 class TestSaveCongressResults:
     def test_saves_csv_and_json(self, tmp_path):
-        with patch(
-            "insider_scanner.utils.config.SCAN_OUTPUTS_DIR",
-            new=tmp_path,
-        ), patch(
-            "insider_scanner.utils.config.ensure_dirs",
+        with (
+            patch(
+                "insider_scanner.utils.config.SCAN_OUTPUTS_DIR",
+                new=tmp_path,
+            ),
+            patch(
+                "insider_scanner.utils.config.ensure_dirs",
+            ),
         ):
-            out = save_congress_results(
-                SAMPLE_TRADES[:2], label="test_scan"
-            )
+            out = save_congress_results(SAMPLE_TRADES[:2], label="test_scan")
 
         assert (tmp_path / "test_scan.csv").exists()
         assert (tmp_path / "test_scan.json").exists()
@@ -293,11 +299,14 @@ class TestSaveCongressResults:
         assert data[0]["ticker"] == "AAPL"
 
     def test_saves_empty(self, tmp_path):
-        with patch(
-            "insider_scanner.utils.config.SCAN_OUTPUTS_DIR",
-            new=tmp_path,
-        ), patch(
-            "insider_scanner.utils.config.ensure_dirs",
+        with (
+            patch(
+                "insider_scanner.utils.config.SCAN_OUTPUTS_DIR",
+                new=tmp_path,
+            ),
+            patch(
+                "insider_scanner.utils.config.ensure_dirs",
+            ),
         ):
             save_congress_results([], label="empty_scan")
 
@@ -307,6 +316,7 @@ class TestSaveCongressResults:
 # -----------------------------------------------------------------------
 # DISPLAY_COLUMNS
 # -----------------------------------------------------------------------
+
 
 class TestDisplayColumns:
     def test_columns_present_in_trade_dict(self):

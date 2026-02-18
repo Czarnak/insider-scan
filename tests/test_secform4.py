@@ -67,7 +67,9 @@ class TestParseSecform4:
     def test_edgar_url_extracted(self):
         """Each row should have a secform4.com filing link."""
         trades = parse_secform4_html(SECFORM4_HTML, "AAPL")
-        assert all(t.edgar_url.startswith("https://www.secform4.com/filings/") for t in trades)
+        assert all(
+            t.edgar_url.startswith("https://www.secform4.com/filings/") for t in trades
+        )
         ceo = [t for t in trades if "COOK" in t.insider_name][0]
         assert "0001214156-25-000011" in ceo.edgar_url
 
@@ -165,7 +167,8 @@ class TestScrapeSecform4:
             status=200,
         )
         trades = scrape_ticker(
-            "AAPL", use_cache=False,
+            "AAPL",
+            use_cache=False,
             start_date=date(2025, 10, 3),
             end_date=date(2025, 10, 17),
         )

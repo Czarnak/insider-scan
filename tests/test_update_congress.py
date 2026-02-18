@@ -117,7 +117,11 @@ class TestFetchFederalLegislators:
             json=[
                 {
                     "id": {"bioguide": "C000003"},
-                    "name": {"first": "Carol", "last": "Lee", "official_full": "Carol Lee"},
+                    "name": {
+                        "first": "Carol",
+                        "last": "Lee",
+                        "official_full": "Carol Lee",
+                    },
                     "terms": [{"type": "sen", "state": "NY", "party": "Democrat"}],
                 }
             ],
@@ -195,25 +199,49 @@ class TestCommitteeSectorMapping:
         assert update_congress.map_committee_to_sector("Homeland Security") == "Defense"
 
     def test_financial_services(self):
-        assert update_congress.map_committee_to_sector("Financial Services") == "Finance"
+        assert (
+            update_congress.map_committee_to_sector("Financial Services") == "Finance"
+        )
 
     def test_banking(self):
-        assert update_congress.map_committee_to_sector("Banking, Housing, and Urban Affairs") == "Finance"
+        assert (
+            update_congress.map_committee_to_sector(
+                "Banking, Housing, and Urban Affairs"
+            )
+            == "Finance"
+        )
 
     def test_energy(self):
-        assert update_congress.map_committee_to_sector("Energy and Natural Resources") == "Energy"
+        assert (
+            update_congress.map_committee_to_sector("Energy and Natural Resources")
+            == "Energy"
+        )
 
     def test_science_technology(self):
-        assert update_congress.map_committee_to_sector("Science, Space, and Technology") == "Technology"
+        assert (
+            update_congress.map_committee_to_sector("Science, Space, and Technology")
+            == "Technology"
+        )
 
     def test_health(self):
-        assert update_congress.map_committee_to_sector("Health, Education, Labor, and Pensions") == "Healthcare"
+        assert (
+            update_congress.map_committee_to_sector(
+                "Health, Education, Labor, and Pensions"
+            )
+            == "Healthcare"
+        )
 
     def test_transportation(self):
-        assert update_congress.map_committee_to_sector("Transportation and Infrastructure") == "Industrials"
+        assert (
+            update_congress.map_committee_to_sector("Transportation and Infrastructure")
+            == "Industrials"
+        )
 
     def test_unknown(self):
-        assert update_congress.map_committee_to_sector("Completely Unknown Committee") == "Other"
+        assert (
+            update_congress.map_committee_to_sector("Completely Unknown Committee")
+            == "Other"
+        )
 
     def test_case_insensitive(self):
         assert update_congress.map_committee_to_sector("ARMED SERVICES") == "Defense"
@@ -245,8 +273,16 @@ class TestDetermineSectors:
 
     def test_priority_order_preserved(self):
         """Sectors returned in priority order regardless of input order."""
-        committees = ["Financial Services", "Armed Services", "Energy and Natural Resources"]
-        assert update_congress.determine_sectors(committees) == ["Defense", "Energy", "Finance"]
+        committees = [
+            "Financial Services",
+            "Armed Services",
+            "Energy and Natural Resources",
+        ]
+        assert update_congress.determine_sectors(committees) == [
+            "Defense",
+            "Energy",
+            "Finance",
+        ]
 
 
 class TestFetchCommittees:
@@ -352,10 +388,24 @@ class TestEnrichWithCommittees:
 class TestMergeAndSave:
     def test_save(self, tmp_path):
         out = tmp_path / "members.json"
-        federal = [{"name": "Smith Alice", "state": "CA", "level": "federal",
-                     "committees": ["Armed Services"], "sector": ["Defense"]}]
-        state = [{"name": "Rivera Carlos", "state": "CA", "level": "state",
-                   "committees": [], "sector": ["Other"]}]
+        federal = [
+            {
+                "name": "Smith Alice",
+                "state": "CA",
+                "level": "federal",
+                "committees": ["Armed Services"],
+                "sector": ["Defense"],
+            }
+        ]
+        state = [
+            {
+                "name": "Rivera Carlos",
+                "state": "CA",
+                "level": "state",
+                "committees": [],
+                "sector": ["Other"],
+            }
+        ]
         update_congress.merge_and_save(federal, state, out)
         data = json.loads(out.read_text())
         assert len(data) == 2
@@ -367,10 +417,20 @@ class TestMergeAndSave:
     def test_deduplication(self, tmp_path):
         out = tmp_path / "members.json"
         federal = [
-            {"name": "Smith Alice", "state": "CA", "level": "federal",
-             "committees": [], "sector": ["Other"]},
-            {"name": "Smith Alice", "state": "CA", "level": "federal",
-             "committees": [], "sector": ["Other"]},
+            {
+                "name": "Smith Alice",
+                "state": "CA",
+                "level": "federal",
+                "committees": [],
+                "sector": ["Other"],
+            },
+            {
+                "name": "Smith Alice",
+                "state": "CA",
+                "level": "federal",
+                "committees": [],
+                "sector": ["Other"],
+            },
         ]
         update_congress.merge_and_save(federal, [], out)
         data = json.loads(out.read_text())
@@ -379,8 +439,15 @@ class TestMergeAndSave:
     def test_dry_run(self, tmp_path, capsys):
         out = tmp_path / "members.json"
         update_congress.merge_and_save(
-            [{"name": "Test", "state": "CA", "level": "federal",
-              "committees": ["Armed Services"], "sector": ["Defense"]}],
+            [
+                {
+                    "name": "Test",
+                    "state": "CA",
+                    "level": "federal",
+                    "committees": ["Armed Services"],
+                    "sector": ["Defense"],
+                }
+            ],
             [],
             out,
             dry_run=True,

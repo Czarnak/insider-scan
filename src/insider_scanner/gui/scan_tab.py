@@ -321,7 +321,8 @@ class ScanTab(QWidget):
         tickers = load_watchlist()
         if not tickers:
             QMessageBox.warning(
-                self, "Watchlist",
+                self,
+                "Watchlist",
                 "No tickers found in data/tickers_watchlist.txt",
             )
             return
@@ -410,10 +411,19 @@ class ScanTab(QWidget):
 
         # Select display columns
         display_cols = [
-            c for c in [
-                "filing_date", "trade_date", "ticker", "insider_name",
-                "insider_title", "trade_type", "shares", "price", "value",
-                "source", "edgar_url",
+            c
+            for c in [
+                "filing_date",
+                "trade_date",
+                "ticker",
+                "insider_name",
+                "insider_title",
+                "trade_type",
+                "shares",
+                "price",
+                "value",
+                "source",
+                "edgar_url",
             ]
             if c in df.columns
         ]
@@ -454,7 +464,6 @@ class ScanTab(QWidget):
     def _on_row_double_click(self, index):
         row = index.row()
         source_index = self.trades_model.mapToSource(index)
-        df = self.trades_model.dataframe
         if row < len(self._trades):
             trade = self._trades[source_index.row()]
             detail = (
@@ -482,6 +491,7 @@ class ScanTab(QWidget):
                 webbrowser.open(trade.edgar_url)
             else:
                 from insider_scanner.core.edgar import build_edgar_url_for_trade
+
                 url = build_edgar_url_for_trade(trade)
                 webbrowser.open(url)
 

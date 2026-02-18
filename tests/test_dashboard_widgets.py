@@ -11,6 +11,7 @@ from insider_scanner.gui.widgets import fg_color, indicator_color
 # fg_color
 # -------------------------------------------------------------------
 
+
 class TestFgColor:
     def test_extreme_fear(self):
         r, g, b, a = fg_color(10)
@@ -38,6 +39,7 @@ class TestFgColor:
 # -------------------------------------------------------------------
 # indicator_color
 # -------------------------------------------------------------------
+
 
 class TestIndicatorColor:
     BANDS = (
