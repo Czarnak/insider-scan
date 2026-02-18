@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 
+import numpy as np
 import pandas as pd
 import requests
 import yfinance as yf
@@ -105,12 +106,6 @@ def calculate_rsi(close: pd.Series, period: int = 14) -> Optional[float]:
     return round(100.0 - 100.0 / (1.0 + rs), 1)
 
 
-def price_vs_lth_rp_pct(price: float, lth_rp: float) -> float | None:
-    if price <= 0 or lth_rp <= 0:
-        return None
-    return (price / lth_rp - 1.0) * 100.0
-
-
 # -------------------------------------------------------------------
 # In-memory TTL cache
 # -------------------------------------------------------------------
@@ -162,12 +157,13 @@ def classify_fng(v: int) -> str:
 # -------------------------------------------------------------------
 
 class StockFearGreedClient:
+    """CNN Fear & Greed Index via the ``fear_and_greed`` library."""
 
     def __init__(
-            self,
-            cache: TTLCache,
-            ttl_minutes: int = 60,
-            timeout_sec: int = 10,
+        self,
+        cache: TTLCache,
+        ttl_minutes: int = 60,
+        timeout_sec: int = 10,
     ):
         self.cache = cache
         self.ttl = timedelta(minutes=ttl_minutes)
@@ -189,16 +185,17 @@ class StockFearGreedClient:
         self.cache.set(cache_key, latest, self.ttl)
         return latest
 
+
 class GoldFearGreedClient:
     """JM Bullion JSON: {"YYYY-MM-DD": score, ...}"""
 
     URL = "https://cdn.jmbullion.com/fearandgreed/fearandgreed.json"
 
     def __init__(
-            self,
-            cache: TTLCache,
-            ttl_minutes: int = 60,
-            timeout_sec: int = 10,
+        self,
+        cache: TTLCache,
+        ttl_minutes: int = 60,
+        timeout_sec: int = 10,
     ):
         self.cache = cache
         self.ttl = timedelta(minutes=ttl_minutes)
@@ -232,10 +229,10 @@ class CryptoFearGreedClient:
     URL = "https://api.alternative.me/fng/"
 
     def __init__(
-            self,
-            cache: TTLCache,
-            ttl_minutes: int = 30,
-            timeout_sec: int = 10,
+        self,
+        cache: TTLCache,
+        ttl_minutes: int = 30,
+        timeout_sec: int = 10,
     ):
         self.cache = cache
         self.ttl = timedelta(minutes=ttl_minutes)
@@ -284,10 +281,10 @@ class CBBIClient:
     URL = "https://colintalkscrypto.com/cbbi/data/latest/cbbi"
 
     def __init__(
-            self,
-            cache: TTLCache,
-            ttl_minutes: int = 60,
-            timeout_sec: int = 10,
+        self,
+        cache: TTLCache,
+        ttl_minutes: int = 60,
+        timeout_sec: int = 10,
     ):
         self.cache = cache
         self.ttl = timedelta(minutes=ttl_minutes)
@@ -304,10 +301,13 @@ class CBBIClient:
             r = requests.get(self.URL, timeout=self.timeout_sec)
             r.raise_for_status()
             data = r.json()
+            # Response is {"Price": ..., "Confidence": 0.42, ...}
+            # or a dict of date→value pairs — handle both formats
             if isinstance(data, dict):
                 if "Confidence" in data:
                     value = round(float(data["Confidence"]) * 100, 1)
                 else:
+                    # Date-keyed: {"2025-01-15": 0.42, ...}
                     latest_key = max(data.keys())
                     raw = data[latest_key]
                     v = float(raw) if not isinstance(raw, dict) else float(
@@ -341,6 +341,7 @@ class MarketProvider:
         self._gold_fng = GoldFearGreedClient(self._cache, ttl_minutes=60)
         self._crypto_fng = CryptoFearGreedClient(self._cache, ttl_minutes=30)
         self._cbbi = CBBIClient(self._cache, ttl_minutes=5)
+
         cm_cache_dir = Path("cache") / "coinmetrics"
         self._cm = CoinMetricsClient()
         self._cm_svc = CoinMetricsIndicatorsService(
@@ -358,7 +359,7 @@ class MarketProvider:
     # -- yfinance wrappers (NOT thread-safe — call sequentially) ------
 
     def get_daily_close(
-            self, symbol: str, lookback_days: int,
+        self, symbol: str, lookback_days: int,
     ) -> pd.Series:
         cache_key = f"daily_close:{symbol}:{lookback_days}"
         cached = self._cache.get(cache_key)
@@ -433,7 +434,7 @@ class MarketProvider:
             if rsi is not None:
                 values["rsi"] = rsi
         except Exception as exc:
-            log.debug("RSI calculation failed: %s", exc)
+            log.warning("RSI calculation failed: %s", exc)
 
         # CBBI from colintalkscrypto.com
         try:
@@ -441,13 +442,13 @@ class MarketProvider:
             if cbbi is not None:
                 values["cbbi"] = cbbi
         except Exception as exc:
-            log.debug("CBBI fetch failed: %s", exc)
+            log.warning("CBBI fetch failed: %s", exc)
 
         # MVRV Z + NUPL from CoinMetrics (cached on disk)
         try:
             snap = self._cm_svc.get_dashboard_snapshot(
                 asset="btc",
-                start_time="2025-01-01",
+                start_time="2020-01-01",
                 force_refresh=False,
             )
             mvrv = snap.get("mvrv_z", {}).get("latest")
@@ -458,12 +459,9 @@ class MarketProvider:
             if n is not None:
                 values["nupl"] = round(float(n), 4)
         except Exception as exc:
-            log.debug("CoinMetrics indicators failed: %s", exc)
+            log.warning("CoinMetrics indicators failed: %s", exc)
 
-        # Merge any externally-set values (MVRV, NUPL, VDD, LTH RP)
-        # These require on-chain data from services like Glassnode,
-        # CoinMetrics, or CryptoQuant.  Set them via:
-        #   provider.latest_indicator_values["mvrv_z"] = 2.1
+        # Merge any externally-set values (VDD, LTH RP, etc.)
         values.update(self.latest_indicator_values)
 
         return values
@@ -536,7 +534,6 @@ class DashboardSnapshot:
 
 class MarketDataProvider(Protocol):
     def fetch_all(self) -> DashboardSnapshot: ...
-
     latest_indicator_values: Dict[str, float]
 
 

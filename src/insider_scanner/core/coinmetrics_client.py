@@ -93,10 +93,13 @@ class CoinMetricsClient:
             df = df.dropna(subset=["time"])
 
         # attempt numeric conversion for metric columns
+        # errors="coerce" is essential: CoinMetrics returns the string
+        # "NaN" for unavailable values, which pd.to_numeric rejects
+        # without coerce (ValueError: Unable to parse string "NaN")
         for c in df.columns:
             if c in ("asset", "time"):
                 continue
-            df[c] = pd.to_numeric(df[c])
+            df[c] = pd.to_numeric(df[c], errors="coerce")
 
         if "time" in df.columns:
             if "asset" in df.columns:
@@ -148,6 +151,12 @@ class CoinMetricsClient:
             try:
                 r = self.session.get(url, params=params, timeout=self.cfg.timeout_sec)
 
+                # Fail immediately on auth errors (no point retrying).
+                # raise_for_status() is called OUTSIDE the retry
+                # exception handler so HTTPError propagates to caller.
+                if r.status_code in (401, 403):
+                    r.raise_for_status()
+
                 # Retry on rate limits and transient server errors
                 if r.status_code in (429, 500, 502, 503, 504):
                     raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
@@ -163,6 +172,9 @@ class CoinMetricsClient:
 
                 return j
 
+            except requests.HTTPError:
+                # Auth errors (401, 403) — don't retry, propagate now
+                raise
             except Exception as e:
                 last_err = e
                 if attempt >= self.cfg.max_retries:

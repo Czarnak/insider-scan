@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any, Literal
@@ -9,6 +10,10 @@ import pandas as pd
 
 from insider_scanner.core.coinmetrics_cached_client import CoinMetricsCachedClient, CoinMetricsCacheConfig
 from insider_scanner.core.coinmetrics_client import CoinMetricsClient
+
+log = logging.getLogger(__name__)
+
+REQUIRED_CAP_COLS = ("CapMrktCurUSD", "CapRealUSD")
 
 
 def nupl(market_cap: pd.Series, realized_cap: pd.Series) -> pd.Series:
@@ -68,21 +73,68 @@ class CoinMetricsIndicatorsService:
     ) -> pd.DataFrame:
         """
         Market cap + realized cap for MVRV/NUPL.
+
+        If the cached response is missing required columns
+        (CapMrktCurUSD, CapRealUSD), retries once with
+        force_refresh=True in case the cache holds stale data.
         """
+        df = self._fetch_caps_raw(asset, start_time, end_time, force_refresh)
+
+        # If cache returned data missing required columns, retry fresh
+        if not force_refresh and not df.empty:
+            missing = [c for c in REQUIRED_CAP_COLS if c not in df.columns]
+            if missing:
+                log.warning(
+                    "CoinMetrics cached response missing columns %s "
+                    "— retrying with force_refresh",
+                    missing,
+                )
+                df = self._fetch_caps_raw(
+                    asset, start_time, end_time, force_refresh=True,
+                )
+
+        if df.empty:
+            return pd.DataFrame()
+
+        # Final check: log if STILL missing after refresh
+        present = [c for c in REQUIRED_CAP_COLS if c in df.columns]
+        missing = [c for c in REQUIRED_CAP_COLS if c not in df.columns]
+        if missing:
+            log.warning(
+                "CoinMetrics API did not return columns: %s. "
+                "Got: %s. MVRV-Z and NUPL cannot be computed. "
+                "This metric may require a Pro API key.",
+                missing, present,
+            )
+            return pd.DataFrame()
+
+        out = df[list(REQUIRED_CAP_COLS)].dropna(how="all").sort_index()
+        return out.tail(self.cfg.tail_points)
+
+    def _fetch_caps_raw(
+            self,
+            asset: str,
+            start_time: Optional[str],
+            end_time: Optional[str],
+            force_refresh: bool,
+    ) -> pd.DataFrame:
+        """Low-level fetch — returns raw DataFrame from cached client."""
         df = self.cm_cached.get_asset_metrics_df(
             assets=asset,
-            metrics=["CapMrktCurUSD", "CapRealUSD"],
+            metrics=list(REQUIRED_CAP_COLS),
             frequency=self.cfg.frequency,
             start_time=start_time,
             end_time=end_time,
             force_refresh=force_refresh,
         )
         if df is None or df.empty:
+            log.warning(
+                "CoinMetrics returned empty data for %s "
+                "(start=%s, refresh=%s)",
+                asset, start_time, force_refresh,
+            )
             return pd.DataFrame()
-
-        cols = [c for c in ["CapMrktCurUSD", "CapRealUSD"] if c in df.columns]
-        out = df[cols].dropna(how="all").sort_index()
-        return out.tail(self.cfg.tail_points)
+        return df
 
     # ---- Computations
     def compute_nupl(
@@ -91,6 +143,8 @@ class CoinMetricsIndicatorsService:
     ) -> pd.Series:
         df = self.get_caps(asset, start_time, end_time, force_refresh)
         if df.empty or "CapMrktCurUSD" not in df or "CapRealUSD" not in df:
+            log.debug("NUPL: insufficient data (empty=%s, cols=%s)",
+                       df.empty, list(df.columns) if not df.empty else [])
             return pd.Series(dtype=float, name="nupl")
         return nupl(df["CapMrktCurUSD"], df["CapRealUSD"])
 
@@ -105,6 +159,8 @@ class CoinMetricsIndicatorsService:
     ) -> pd.Series:
         df = self.get_caps(asset, start_time, end_time, force_refresh)
         if df.empty or "CapMrktCurUSD" not in df or "CapRealUSD" not in df:
+            log.debug("MVRV-Z: insufficient data (empty=%s, cols=%s)",
+                       df.empty, list(df.columns) if not df.empty else [])
             return pd.Series(dtype=float, name="mvrv_z_score")
         return mvrv_z_score(df["CapMrktCurUSD"], df["CapRealUSD"], sigma_window=sigma_window, sigma_method=sigma_method)
 

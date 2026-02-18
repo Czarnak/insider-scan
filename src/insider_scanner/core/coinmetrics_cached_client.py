@@ -88,10 +88,15 @@ class CoinMetricsCachedClient:
             **extra_params,
         )
 
-        # serialize a minimal JSON form for cache
-        j = self._df_to_json(df)
-        set_cached(self.cfg.cache_dir, key, json.dumps(j))
-        return df
+        # Only cache non-empty results to avoid poisoning the cache
+        # with failed/partial API responses for the full TTL.
+        if df is not None and not df.empty:
+            j = self._df_to_json(df)
+            set_cached(self.cfg.cache_dir, key, json.dumps(j))
+        else:
+            log.debug("Skipping cache write for empty CoinMetrics response")
+
+        return df if df is not None else pd.DataFrame()
 
     @staticmethod
     def _json_to_df(j: JSON) -> pd.DataFrame:
@@ -108,7 +113,7 @@ class CoinMetricsCachedClient:
         for c in df.columns:
             if c in ("asset",):
                 continue
-            df[c] = pd.to_numeric(df[c])
+            df[c] = pd.to_numeric(df[c], errors="coerce")
 
         return df
 
