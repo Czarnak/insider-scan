@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import json
 from datetime import date
-from unittest.mock import patch
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
 
 from insider_scanner.core.models import CongressTrade
 from insider_scanner.gui.congress_tab import (
@@ -290,7 +292,7 @@ class TestSaveReloadPipeline:
         all_trades = _house_trades() + _senate_trades()
 
         with patch(
-                "insider_scanner.utils.config.SCAN_OUTPUTS_DIR", new=tmp_path,
+            "insider_scanner.utils.config.SCAN_OUTPUTS_DIR", new=tmp_path,
         ), patch(
             "insider_scanner.utils.config.ensure_dirs",
         ):
@@ -308,7 +310,7 @@ class TestSaveReloadPipeline:
         all_trades = _house_trades() + _senate_trades()
 
         with patch(
-                "insider_scanner.utils.config.SCAN_OUTPUTS_DIR", new=tmp_path,
+            "insider_scanner.utils.config.SCAN_OUTPUTS_DIR", new=tmp_path,
         ), patch(
             "insider_scanner.utils.config.ensure_dirs",
         ):
@@ -335,7 +337,7 @@ class TestSaveReloadPipeline:
         )
 
         with patch(
-                "insider_scanner.utils.config.SCAN_OUTPUTS_DIR", new=tmp_path,
+            "insider_scanner.utils.config.SCAN_OUTPUTS_DIR", new=tmp_path,
         ), patch(
             "insider_scanner.utils.config.ensure_dirs",
         ):
@@ -356,8 +358,8 @@ class TestScraperIntegration:
     def test_house_only_scan(self):
         """Simulate a House-only scan through the pipeline."""
         with patch(
-                "insider_scanner.core.congress_house.scrape_house_trades",
-                return_value=_house_trades(),
+            "insider_scanner.core.congress_house.scrape_house_trades",
+            return_value=_house_trades(),
         ) as mock_house:
             from insider_scanner.core.congress_house import scrape_house_trades
             trades = scrape_house_trades(
@@ -373,8 +375,8 @@ class TestScraperIntegration:
     def test_senate_only_scan(self):
         """Simulate a Senate-only scan through the pipeline."""
         with patch(
-                "insider_scanner.core.congress_senate.scrape_senate_trades",
-                return_value=_senate_trades(),
+            "insider_scanner.core.congress_senate.scrape_senate_trades",
+            return_value=_senate_trades(),
         ) as mock_senate:
             from insider_scanner.core.congress_senate import scrape_senate_trades
             trades = scrape_senate_trades(
@@ -390,8 +392,8 @@ class TestScraperIntegration:
     def test_combined_scan(self):
         """Simulate the full House + Senate scan → filter → save flow."""
         with patch(
-                "insider_scanner.core.congress_house.scrape_house_trades",
-                return_value=_house_trades(),
+            "insider_scanner.core.congress_house.scrape_house_trades",
+            return_value=_house_trades(),
         ), patch(
             "insider_scanner.core.congress_senate.scrape_senate_trades",
             return_value=_senate_trades(),
@@ -419,8 +421,8 @@ class TestScraperIntegration:
     def test_all_officials_scan(self):
         """Simulate 'All' officials scan (official_name=None)."""
         with patch(
-                "insider_scanner.core.congress_house.scrape_house_trades",
-                return_value=_house_trades(),
+            "insider_scanner.core.congress_house.scrape_house_trades",
+            return_value=_house_trades(),
         ) as mock_house:
             from insider_scanner.core.congress_house import scrape_house_trades
             trades = scrape_house_trades(official_name=None)

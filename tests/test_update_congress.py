@@ -14,6 +14,7 @@ sys.path.insert(0, str(_scripts_dir))
 
 import update_congress  # noqa: E402
 
+
 SAMPLE_YAML = """
 - id:
     bioguide: A000001
@@ -352,9 +353,9 @@ class TestMergeAndSave:
     def test_save(self, tmp_path):
         out = tmp_path / "members.json"
         federal = [{"name": "Smith Alice", "state": "CA", "level": "federal",
-                    "committees": ["Armed Services"], "sector": ["Defense"]}]
+                     "committees": ["Armed Services"], "sector": ["Defense"]}]
         state = [{"name": "Rivera Carlos", "state": "CA", "level": "state",
-                  "committees": [], "sector": ["Other"]}]
+                   "committees": [], "sector": ["Other"]}]
         update_congress.merge_and_save(federal, state, out)
         data = json.loads(out.read_text())
         assert len(data) == 2

@@ -1,6 +1,6 @@
 # Insider Scanner
 
-Scan insider trades from **secform4.com**, **openinsider.com**, and **SEC EDGAR**. Includes congressional financial disclosure scanning (House and Senate), multi-source deduplication, committee-based sector filtering, and a desktop GUI with EDGAR filing links.
+Scan insider trades from **secform4.com**, **openinsider.com**, and **SEC EDGAR**. Includes congressional financial disclosure scanning (House and Senate), a live market dashboard with price cards, VIX chart, and Fear & Greed indexes, multi-source deduplication, committee-based sector filtering, and a desktop GUI with EDGAR filing links.
 
 ---
 
@@ -14,7 +14,7 @@ pip install -e ".[dev]"
 
 ### Requirements
 
-Python 3.11+. Dependencies: `requests`, `beautifulsoup4`, `lxml`, `pandas`, `PySide6`, `pyyaml`, `pdfplumber`.
+Python 3.11+. Dependencies: `requests`, `beautifulsoup4`, `lxml`, `pandas`, `PySide6`, `pyyaml`, `pdfplumber`, `pyqtgraph`, `numpy`, `yfinance`, `fear_and_greed`.
 
 ---
 
@@ -30,6 +30,7 @@ python -m insider_scanner.main
 
 The GUI provides:
 
+- **Dashboard**: Live market overview — price cards, VIX chart, Fear & Greed indexes, and configurable indicator tiles with auto-refresh
 - **Ticker search**: Enter a ticker and scan secform4.com + openinsider.com simultaneously
 - **Latest trades**: Fetch recent insider trades across all tickers, with configurable count (10–500)
 - **Watchlist scan**: One-click scan of all tickers in `data/tickers_watchlist.txt` — results merged and deduplicated
@@ -74,6 +75,11 @@ insider-scanner-cli scan AAPL --congress-only
 src/insider_scanner/
 ├── core/
 │   ├── models.py        # InsiderTrade + CongressTrade dataclasses
+│   ├── dashboard.py     # Market data providers, Fear & Greed clients, TTL cache
+│   ├── bgeometrics_client.py # BGeometrics free API for MVRV Z-Score, NUPL
+│   ├── coinmetrics_client.py # CoinMetrics API client (Pro key optional)
+│   ├── coinmetrics_cached_client.py # Disk-cached wrapper for CoinMetrics
+│   ├── coinmetrics_indicators_service.py # MVRV/NUPL computation from raw caps
 │   ├── secform4.py      # secform4.com scraper (compound-column parser, direct filing links)
 │   ├── openinsider.py   # openinsider.com HTML parser + scraper
 │   ├── edgar.py         # SEC EDGAR CIK resolver (JSON primary + HTML fallback) + filing URLs
@@ -83,9 +89,10 @@ src/insider_scanner/
 │   └── merger.py        # Multi-source dedup, filtering, export
 ├── gui/
 │   ├── main_window.py   # Main window (default OS style)
+│   ├── dashboard_tab.py # Dashboard: live prices, VIX chart, F&G, indicators
 │   ├── scan_tab.py      # Insider scan: search, date range, filters, results table, EDGAR links
 │   ├── congress_tab.py  # Congress scan: official selection, House/Senate scraping, sector filtering
-│   └── widgets.py       # Pandas table model with Congress highlighting
+│   └── widgets.py       # Pandas table model, price/value cards, color helpers
 ├── utils/
 │   ├── config.py        # Paths, SEC compliance constants
 │   ├── logging.py       # Logging setup
@@ -123,6 +130,20 @@ scripts/
 2. **Search**: POST to the EFD JSON API with senator name, report type (PTR), and date range. Results include links to individual PTR pages. Paper filings (scanned PDFs) are automatically filtered out.
 3. **Parse**: Each electronic PTR page contains an HTML table with columns for transaction date, owner, ticker, asset name, type, amount range, and comment. These are parsed via BeautifulSoup.
 4. **Convert**: Transactions are converted to `CongressTrade` records. Tickers are read directly from the "Ticker" column when available; when the ticker is "--", it's extracted from the asset description (e.g. "Vanguard ETF (BND)" → BND).
+
+### Dashboard Tab
+
+The **Dashboard** tab provides live market overview data, refreshing every 60 seconds:
+
+- **Price cards**: Gold, Silver, Crude Oil, S&P 500, and Nasdaq futures with 1-day % change and color-coded backgrounds (green for up, red for down)
+- **VIX chart**: 30-day VIX history rendered as a line chart using pyqtgraph with date axis
+- **Fear & Greed indexes**: Stocks (CNN via `fear_and_greed` library), Gold (JM Bullion), and Crypto (Alternative.me) with score-based coloring
+- **Indicator tiles**: Configurable grid of crypto/macro indicators (MVRV Z-Score, NUPL, RSI, VDD, Price vs LTH RP, CBBI) with band-based color coding
+- **On-chain data**: MVRV Z-Score and NUPL sourced from BGeometrics free API (bitcoin-data.com); RSI calculated locally from BTC-USD price; CBBI from colintalkscrypto.com
+- **Threading guard**: Prevents worker accumulation when data sources are slow — queued refreshes wait for the current batch to finish
+- **In-memory caching**: TTL-based cache (10 min for prices, 30–60 min for F&G, 6 hours for on-chain indicators) avoids redundant API calls
+
+The dashboard uses dependency injection via a `MarketDataProvider` Protocol, making it straightforward to swap data sources or inject mocks for testing.
 
 ### Congress Tab — GUI Integration
 
@@ -221,6 +242,10 @@ Tests are split into two categories:
 | Module | Tests | Description |
 |--------|------:|-------------|
 | `test_models.py` | 16 | InsiderTrade + CongressTrade dataclasses, amount range parsing |
+| `test_dashboard.py` | 54 | TTLCache, classify_fng, _extract_close, FNG clients, RSI, CBBI, MarketProvider, fetch_all |
+| `test_dashboard_widgets.py` | 19 | fg_color, indicator_color band mapping |
+| `test_bgeometrics.py` | 21 | BGeometrics text parser, client caching, error handling, endpoint config |
+| `test_coinmetrics.py` | 16 | NUPL/MVRV math, indicators service, cached client, 403 fail-fast |
 | `test_secform4.py` | 19 | secform4.com compound-column HTML parser |
 | `test_openinsider.py` | 13 | openinsider.com scraper |
 | `test_edgar.py` | 14 | CIK resolution (JSON + HTML fallback), EDGAR URL builder |
@@ -258,16 +283,6 @@ To add a new scraping source:
 2. Have the parser return `InsiderTrade` records with `source="newsource"`
 3. Add it to the merger pipeline in `scan_tab.py` and `cli.py`
 4. Write mocked tests in `tests/test_newsource.py`
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ---
 

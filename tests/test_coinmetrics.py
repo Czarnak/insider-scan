@@ -2,24 +2,26 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from datetime import timedelta
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
 import pytest
 import requests
 
-from insider_scanner.core.coinmetrics_cached_client import (
-    CoinMetricsCachedClient,
-    CoinMetricsCacheConfig,
-)
-from insider_scanner.core.coinmetrics_client import CoinMetricsClient
 from insider_scanner.core.coinmetrics_indicators_service import (
     CoinMetricsIndicatorsConfig,
     CoinMetricsIndicatorsService,
     mvrv_z_score,
     nupl,
 )
+from insider_scanner.core.coinmetrics_cached_client import (
+    CoinMetricsCachedClient,
+    CoinMetricsCacheConfig,
+)
+from insider_scanner.core.coinmetrics_client import CoinMetricsClient
 
 
 # -------------------------------------------------------------------
@@ -109,7 +111,7 @@ class TestCoinMetricsIndicatorsService:
         assert "CapRealUSD" in result.columns
 
     def test_get_caps_missing_realized_cap_logs_warning(
-            self, service, mock_cm, caplog,
+        self, service, mock_cm, caplog,
     ):
         """If API returns only CapMrktCurUSD, log warning & return empty."""
         idx = pd.date_range("2024-01-01", periods=50, freq="D", tz="UTC")
