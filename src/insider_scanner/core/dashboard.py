@@ -32,11 +32,6 @@ except ImportError:
 
     yf = _YFinanceStub()
 
-try:
-    import fear_and_greed
-except ImportError:
-    fear_and_greed = None
-
 from insider_scanner.core.bgeometrics_client import BGeometricsClient
 
 log = logging.getLogger(__name__)
@@ -171,7 +166,9 @@ def classify_fng(v: int) -> str:
 
 
 class StockFearGreedClient:
-    """CNN Fear & Greed Index via the ``fear_and_greed`` library."""
+    """CNN Fear & Greed Index via CNN's public graphdata endpoint."""
+
+    URL = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
 
     def __init__(
         self,
@@ -190,12 +187,14 @@ class StockFearGreedClient:
             return cached
 
         latest: Optional[Tuple[int, str]] = None
-        if fear_and_greed is None:
-            self.cache.set(cache_key, latest, self.ttl)
-            return latest
         try:
-            score = int(fear_and_greed.get().value)
-            latest = (score, classify_fng(score))
+            r = requests.get(self.URL, timeout=self.timeout_sec)
+            r.raise_for_status()
+            data = r.json()
+            fg = data.get("fear_and_greed", {})
+            score = int(float(fg.get("score")))
+            label = str(fg.get("rating") or classify_fng(score))
+            latest = (score, label)
         except Exception:
             latest = None
 

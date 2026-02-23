@@ -28,14 +28,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import requests
 import sys
 from pathlib import Path
 
 # Add project root to path so we can import project modules
 _project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_project_root / "src"))
-
-import requests
 
 FEDERAL_URL = (
     "https://raw.githubusercontent.com/unitedstates/"

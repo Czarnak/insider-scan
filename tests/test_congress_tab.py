@@ -288,7 +288,7 @@ class TestSaveCongressResults:
                 "insider_scanner.utils.config.ensure_dirs",
             ),
         ):
-            out = save_congress_results(SAMPLE_TRADES[:2], label="test_scan")
+            save_congress_results(SAMPLE_TRADES[:2], label="test_scan")
 
         assert (tmp_path / "test_scan.csv").exists()
         assert (tmp_path / "test_scan.json").exists()

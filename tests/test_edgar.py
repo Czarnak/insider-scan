@@ -108,7 +108,7 @@ class TestResolveCik:
             body=EDGAR_CIK_HTML,
             status=200,
         )
-        cik = resolve_cik("UNKNOWN_BUT_IN_HTML", use_cache=False)
+        assert resolve_cik("UNKNOWN_BUT_IN_HTML", use_cache=False) == "0000320193"
         # JSON miss → HTML fallback tried (2 requests total)
         assert len(responses.calls) == 2
 

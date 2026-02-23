@@ -17,6 +17,7 @@ from insider_scanner.core.dashboard import (
     IndicatorSpec,
     MarketProvider,
     PRICE_SYMBOLS,
+    StockFearGreedClient,
     TTLCache,
     _extract_close,
     calculate_rsi,
@@ -188,6 +189,39 @@ class TestCalculateRsi:
         # But with flat prices, delta=0, so both gain and loss are 0
         # In practice, EWM of all zeros gives 0/0 handled as RSI=100
         assert rsi is not None
+
+
+# -------------------------------------------------------------------
+# StockFearGreedClient
+# -------------------------------------------------------------------
+
+
+class TestStockFearGreedClient:
+    def test_network_error_returns_none(self):
+        cache = TTLCache()
+        client = StockFearGreedClient(cache)
+
+        with patch(
+            "insider_scanner.core.dashboard.requests.get",
+            side_effect=ConnectionError("offline"),
+        ):
+            assert client.get_latest() is None
+
+    def test_parses_response(self):
+        cache = TTLCache()
+        client = StockFearGreedClient(cache)
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "fear_and_greed": {"score": 72, "rating": "Greed"},
+        }
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch(
+            "insider_scanner.core.dashboard.requests.get", return_value=mock_resp
+        ):
+            result = client.get_latest()
+
+        assert result == (72, "Greed")
 
 
 # -------------------------------------------------------------------
@@ -427,11 +461,16 @@ class TestMarketProvider:
 
     def test_get_fear_greed_structure(self):
         provider = MarketProvider()
-        with patch.object(provider._gold_fng, "get_latest", return_value=(55, "Greed")):
+        with patch.object(provider._stock_fng, "get_latest", return_value=None):
             with patch.object(
-                provider._crypto_fng, "get_latest", return_value=(30, "Fear")
+                provider._gold_fng,
+                "get_latest",
+                return_value=(55, "Greed"),
             ):
-                fg = provider.get_fear_greed()
+                with patch.object(
+                    provider._crypto_fng, "get_latest", return_value=(30, "Fear")
+                ):
+                    fg = provider.get_fear_greed()
         assert fg["stocks"] is None
         assert fg["gold"] == (55, "Greed")
         assert fg["crypto"] == (30, "Fear")
@@ -480,14 +519,17 @@ class TestMarketProvider:
         fake_df = self._make_df(30)
 
         with patch("insider_scanner.core.dashboard.yf.download", return_value=fake_df):
-            with patch.object(
-                provider._gold_fng, "get_latest", return_value=(55, "Greed")
-            ):
+            with patch.object(provider._stock_fng, "get_latest", return_value=None):
                 with patch.object(
-                    provider._crypto_fng, "get_latest", return_value=(30, "Fear")
+                    provider._gold_fng, "get_latest", return_value=(55, "Greed")
                 ):
-                    with patch.object(provider._cbbi, "get_latest", return_value=42.0):
-                        snap = provider.fetch_all()
+                    with patch.object(
+                        provider._crypto_fng, "get_latest", return_value=(30, "Fear")
+                    ):
+                        with patch.object(
+                            provider._cbbi, "get_latest", return_value=42.0
+                        ):
+                            snap = provider.fetch_all()
 
         assert isinstance(snap, DashboardSnapshot)
         # Prices: 5 symbols + BTC-USD fetched for RSI
@@ -504,16 +546,19 @@ class TestMarketProvider:
             "insider_scanner.core.dashboard.yf.download",
             side_effect=Exception("network down"),
         ):
-            with patch.object(
-                provider._gold_fng,
-                "get_latest",
-                return_value=(55, "Greed"),
-            ):
+            with patch.object(provider._stock_fng, "get_latest", return_value=None):
                 with patch.object(
-                    provider._crypto_fng, "get_latest", return_value=None
+                    provider._gold_fng,
+                    "get_latest",
+                    return_value=(55, "Greed"),
                 ):
-                    with patch.object(provider._cbbi, "get_latest", return_value=None):
-                        snap = provider.fetch_all()
+                    with patch.object(
+                        provider._crypto_fng, "get_latest", return_value=None
+                    ):
+                        with patch.object(
+                            provider._cbbi, "get_latest", return_value=None
+                        ):
+                            snap = provider.fetch_all()
 
         assert isinstance(snap, DashboardSnapshot)
         # Prices are empty Series (yfinance failed)

@@ -177,6 +177,6 @@ class TestTradesToDataframe:
 class TestSaveScanResults:
     def test_save_creates_files(self, tmp_path):
         trades = [_trade()]
-        out = save_scan_results(trades, label="test_scan", output_dir=tmp_path)
+        save_scan_results(trades, label="test_scan", output_dir=tmp_path)
         assert (tmp_path / "test_scan.csv").exists()
         assert (tmp_path / "test_scan.json").exists()
